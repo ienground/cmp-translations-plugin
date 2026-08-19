@@ -1,4 +1,4 @@
-package org.jetbrains.plugins.template
+package zone.ien.composemultiplatformtranslations
 
 import com.intellij.DynamicBundle
 import org.jetbrains.annotations.NonNls
