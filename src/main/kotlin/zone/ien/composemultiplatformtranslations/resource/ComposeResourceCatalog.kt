@@ -1,0 +1,57 @@
+package zone.ien.composemultiplatformtranslations.resource
+
+import com.intellij.openapi.application.ReadAction
+import com.intellij.openapi.project.Project
+import com.intellij.openapi.vfs.VirtualFile
+import com.intellij.psi.PsiManager
+import com.intellij.psi.xml.XmlFile
+
+data class ComposeResourceDocument(
+    val descriptor: ComposeResourceDescriptor,
+    val entries: List<ComposeStringEntry>,
+)
+
+data class ComposeResourceSet(
+    val resourceRoot: VirtualFile,
+    val sourceSetName: String,
+    val documents: List<ComposeResourceDocument>,
+) {
+
+    val defaultDocument: ComposeResourceDocument?
+        get() = documentFor(ComposeResourceQualifier.DEFAULT)
+
+    val localizedDocuments: List<ComposeResourceDocument>
+        get() = documents.filterNot { it.descriptor.qualifier == ComposeResourceQualifier.DEFAULT }
+
+    fun documentFor(qualifier: ComposeResourceQualifier): ComposeResourceDocument? =
+        documents.firstOrNull { it.descriptor.qualifier == qualifier }
+}
+
+/** Loads strings.xml PSI entries and groups them by composeResources directory. */
+class ComposeResourceCatalog(
+    private val project: Project,
+    private val locator: ComposeResourceLocator = ComposeResourceLocator(project),
+    private val parser: ComposeStringsXmlParser = ComposeStringsXmlParser(),
+) {
+
+    fun load(): List<ComposeResourceSet> = ReadAction.compute<List<ComposeResourceSet>, RuntimeException> {
+        val psiManager = PsiManager.getInstance(project)
+        val documents = locator.findFiles().mapNotNull { descriptor ->
+            val xmlFile = psiManager.findFile(descriptor.file) as? XmlFile ?: return@mapNotNull null
+            ComposeResourceDocument(descriptor, parser.parse(xmlFile))
+        }
+
+        documents
+            .groupBy { it.descriptor.resourceRoot.url }
+            .values
+            .map { groupedDocuments ->
+                val first = groupedDocuments.first()
+                ComposeResourceSet(
+                    resourceRoot = first.descriptor.resourceRoot,
+                    sourceSetName = first.descriptor.sourceSetName,
+                    documents = groupedDocuments.sortedBy { it.descriptor.qualifier.rawValue },
+                )
+            }
+            .sortedWith(compareBy({ it.sourceSetName != "commonMain" }, { it.sourceSetName }, { it.resourceRoot.url }))
+    }
+}

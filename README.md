@@ -1,20 +1,14 @@
-# IntelliJ Platform Plugin Template
+# Compose Multiplatform Translations Editor Plugin
 
-[![official JetBrains project](https://jb.gg/badges/official.svg)][jb:github]
-[![Twitter Follow](https://img.shields.io/badge/follow-%40JBPlatform-1DA1F2?logo=twitter)](https://x.com/JBPlatform)
-[![Build](https://github.com/JetBrains/intellij-platform-plugin-template/workflows/Build/badge.svg)][gh:build]
+Compose Multiplatform의 `composeResources` 문자열 리소스를 IntelliJ IDEA와 Android Studio에서 관리하는 플러그인입니다. XML PSI 기반 Translation Editor, 누락 번역·placeholder 검증, 검색·필터, resource navigation을 제공합니다.
 
-![IntelliJ Platform Plugin Template][file:intellij-platform-plugin-template-dark]
-![IntelliJ Platform Plugin Template][file:intellij-platform-plugin-template-light]
+자세한 지원 경로와 사용법은 [compose-resources-editor.md](docs/compose-resources-editor.md)를 참고하세요.
 
-> [!NOTE]
-> Click the <kbd>Use this template</kbd> button and clone it in IntelliJ IDEA.
+현재 프로젝트는 IntelliJ Platform Plugin Template을 기반으로 구성되어 있으며, 아래 내용은 Gradle·플러그인 개발 환경을 참고하기 위한 원문입니다.
 
-**IntelliJ Platform Plugin Template** is a repository that provides a pure template to make it easier to create a new plugin project (check the [Creating a repository from a template][gh:template] article).
+---
 
-The main goal of this template is to speed up the setup phase of plugin development for both new and experienced developers by preconfiguring the project scaffold and CI, linking to the proper documentation pages, and keeping everything organized.
-
-[gh:template]: https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-repository-from-a-template
+## 템플릿 기반 개발 참고
 
 If you're still not quite sure what this is all about, read our introduction: [What is the IntelliJ Platform?][docs:intro]
 

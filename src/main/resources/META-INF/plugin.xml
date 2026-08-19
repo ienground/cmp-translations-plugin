@@ -2,10 +2,10 @@
 <idea-plugin>
     <id>zone.ien.composemultiplatformtranslations</id>
     <name>Compose Multiplatform Translations</name>
-    <vendor>JetBrains</vendor>
+    <vendor>IEN</vendor>
     <description><![CDATA[
-        <p><b>IntelliJ Platform Plugin Template</b> is a repository that provides a pure template to make it easier to create a new plugin project.</p>
-        <p>The main goal of this template is to speed up the setup phase of plugin development for both new and experienced developers by preconfiguring the project scaffold and CI, linking to the proper documentation pages, and keeping everything organized.</p>
+        <p><b>Compose Multiplatform Translations</b> manages composeResources string resources from IntelliJ IDEA and Android Studio.</p>
+        <p>It provides a translation table, missing-key and placeholder validation, PSI-based editing, and navigation without changing the Compose Multiplatform runtime.</p>
     ]]></description>
 
     <depends>com.intellij.modules.platform</depends>
@@ -13,7 +13,6 @@
     <resource-bundle>messages.MyBundle</resource-bundle>
 
     <extensions defaultExtensionNs="com.intellij">
-        <toolWindow factoryClass="zone.ien.composemultiplatformtranslations.toolWindow.MyToolWindowFactory" id="MyToolWindow"/>
-        <postStartupActivity implementation="zone.ien.composemultiplatformtranslations.startup.MyProjectActivity" />
+        <toolWindow factoryClass="zone.ien.composemultiplatformtranslations.toolWindow.MyToolWindowFactory" id="ComposeTranslations"/>
     </extensions>
 </idea-plugin>

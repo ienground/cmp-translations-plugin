@@ -1,5 +1,11 @@
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 
+val localAndroidStudioPath = providers.gradleProperty("androidStudioPath").orNull
+    ?: listOf(
+        "${System.getProperty("user.home")}/Applications/Android Studio.app",
+        "/Applications/Android Studio.app",
+    ).firstOrNull { path -> file(path).isDirectory }
+
 plugins {
     id("org.jetbrains.kotlin.jvm")
     id("org.jetbrains.intellij.platform")
@@ -11,7 +17,11 @@ dependencies {
 
     // IntelliJ Platform Gradle Plugin Dependencies Extension - read more: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin-dependencies-extension.html
     intellijPlatform {
-        intellijIdea("2025.2.6.2")
+        if (localAndroidStudioPath != null) {
+            local(localAndroidStudioPath)
+        } else {
+            intellijIdea("2025.2.6.2")
+        }
         testFramework(TestFrameworkType.Platform)
     }
 }
