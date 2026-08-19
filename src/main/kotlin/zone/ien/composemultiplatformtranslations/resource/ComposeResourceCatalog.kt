@@ -5,6 +5,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiManager
 import com.intellij.psi.xml.XmlFile
+import java.util.concurrent.Callable
 
 data class ComposeResourceDocument(
     val descriptor: ComposeResourceDescriptor,
@@ -35,7 +36,7 @@ class ComposeResourceCatalog(
     private val parser: ComposeStringsXmlParser = ComposeStringsXmlParser(),
 ) {
 
-    fun load(): List<ComposeResourceSet> = ReadAction.compute<List<ComposeResourceSet>, RuntimeException> {
+    fun load(): List<ComposeResourceSet> = ReadAction.nonBlocking(Callable {
         val psiManager = PsiManager.getInstance(project)
         val documents = locator.findFiles().mapNotNull { descriptor ->
             val xmlFile = psiManager.findFile(descriptor.file) as? XmlFile ?: return@mapNotNull null
@@ -55,5 +56,5 @@ class ComposeResourceCatalog(
                 )
             }
             .sortedWith(compareBy({ it.sourceSetName != "commonMain" }, { it.moduleName }, { it.sourceSetName }, { it.resourceRoot.url }))
-    }
+    }).executeSynchronously()
 }

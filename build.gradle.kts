@@ -12,6 +12,12 @@ plugins {
     id("org.jetbrains.changelog")
 }
 
+kotlin {
+    compilerOptions {
+        freeCompilerArgs.add("-jvm-default=no-compatibility")
+    }
+}
+
 dependencies {
     testImplementation("junit:junit:4.13.2")
 
@@ -23,5 +29,11 @@ dependencies {
             intellijIdea("2025.2.6.2")
         }
         testFramework(TestFrameworkType.Platform)
+    }
+}
+
+intellijPlatform {
+    publishing {
+        channels = listOf("beta")
     }
 }

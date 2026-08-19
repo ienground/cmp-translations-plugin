@@ -2,7 +2,8 @@
 <idea-plugin>
     <id>zone.ien.composemultiplatformtranslations</id>
     <name>Compose Multiplatform Translations</name>
-    <vendor>IEN</vendor>
+    <vendor>IENLAB</vendor>
+    <url>https://github.com/ienground/cmp-translations-plugin</url>
     <description><![CDATA[
         <p><b>Compose Multiplatform Translations</b> manages composeResources string resources from IntelliJ IDEA and Android Studio.</p>
         <p>It provides a translation table, missing-key and placeholder validation, PSI-based editing, and navigation without changing the Compose Multiplatform runtime.</p>
