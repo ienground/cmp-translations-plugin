@@ -6,6 +6,7 @@ import com.intellij.openapi.vfs.VirtualFile
 data class ComposeResourceDescriptor(
     val file: VirtualFile,
     val resourceRoot: VirtualFile,
+    val moduleName: String,
     val sourceSetName: String,
     val qualifier: ComposeResourceQualifier,
 ) {
@@ -22,10 +23,12 @@ data class ComposeResourceDescriptor(
             val sourceSetDirectory = resourceRoot.parent ?: return null
             val sourceDirectory = sourceSetDirectory.parent ?: return null
             if (sourceDirectory.name != "src") return null
+            val moduleDirectory = sourceDirectory.parent ?: return null
 
             return ComposeResourceDescriptor(
                 file = file,
                 resourceRoot = resourceRoot,
+                moduleName = moduleDirectory.name,
                 sourceSetName = sourceSetDirectory.name,
                 qualifier = qualifier,
             )

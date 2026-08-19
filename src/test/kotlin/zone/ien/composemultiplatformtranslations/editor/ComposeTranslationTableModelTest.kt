@@ -83,4 +83,21 @@ class ComposeTranslationTableModelTest {
 
         assertEquals(Triple("login", ko, "로그인 버튼"), edited)
     }
+
+    @Test
+    fun allowsEditingResourceKeysSeparatelyFromTranslationValues() {
+        val model = ComposeTranslationTableModel()
+        var editedKey: Pair<String, String>? = null
+        model.onKeyEdited = { oldKey, newKey -> editedKey = oldKey to newKey }
+        model.setEntries(
+            defaultEntries = listOf(ComposeStringEntry("login", "Login")),
+            localizedEntries = mapOf(ko to listOf(ComposeStringEntry("login", "로그인"))),
+            issues = emptyList(),
+        )
+
+        assertTrue(model.isCellEditable(0, 0))
+        model.setValueAt("sign_in", 0, 0)
+
+        assertEquals("login" to "sign_in", editedKey)
+    }
 }

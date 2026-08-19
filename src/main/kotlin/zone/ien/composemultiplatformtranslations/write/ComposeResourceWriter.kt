@@ -7,6 +7,7 @@ import com.intellij.psi.xml.XmlFile
 import com.intellij.psi.xml.XmlTag
 import com.intellij.psi.XmlElementFactory
 import zone.ien.composemultiplatformtranslations.resource.ComposeResourceDocument
+import zone.ien.composemultiplatformtranslations.resource.ComposeResourceQualifier
 import zone.ien.composemultiplatformtranslations.resource.ComposeResourceSet
 
 /** Applies translation changes through IntelliJ XML PSI write commands. */
@@ -41,6 +42,51 @@ class ComposeResourceWriter(private val project: Project) {
             if (findStringTag(xmlFile, key) != null) return@runWriteCommand false
 
             addTag(xmlFile, key, value)
+        }
+
+    fun addStringResource(
+        resourceSet: ComposeResourceSet,
+        key: String,
+        defaultValue: String,
+        localizedValues: Map<ComposeResourceQualifier, String>,
+    ): Boolean = runWriteCommand {
+        val defaultDocument = resourceSet.defaultDocument ?: return@runWriteCommand false
+        val defaultFile = findXmlFile(defaultDocument) ?: return@runWriteCommand false
+        if (key.isBlank() || findStringTag(defaultFile, key) != null) return@runWriteCommand false
+
+        val localeFiles = resourceSet.localizedDocuments.mapNotNull { document ->
+            findXmlFile(document)?.let { document.descriptor.qualifier to it }
+        }
+        if (localeFiles.size != resourceSet.localizedDocuments.size) return@runWriteCommand false
+
+        addTag(defaultFile, key, defaultValue)
+        localeFiles.forEach { (qualifier, file) ->
+            val value = localizedValues[qualifier]?.takeIf(String::isNotBlank) ?: return@forEach
+            val existingTag = findStringTag(file, key)
+            if (existingTag != null) {
+                existingTag.value.text = value
+            } else {
+                addTag(file, key, value)
+            }
+        }
+        true
+    }
+
+    fun renameKey(resourceSet: ComposeResourceSet, oldKey: String, newKey: String): Boolean =
+        runWriteCommand {
+            if (newKey.isBlank()) return@runWriteCommand false
+            if (oldKey == newKey) return@runWriteCommand true
+
+            val files = resourceSet.documents.mapNotNull { document ->
+                findXmlFile(document)
+            }
+            if (files.size != resourceSet.documents.size) return@runWriteCommand false
+            if (files.any { file -> findStringTag(file, newKey) != null }) return@runWriteCommand false
+
+            files.forEach { file ->
+                findStringTag(file, oldKey)?.setAttribute("name", newKey)
+            }
+            true
         }
 
     fun removeKey(resourceSet: ComposeResourceSet, key: String): Int =

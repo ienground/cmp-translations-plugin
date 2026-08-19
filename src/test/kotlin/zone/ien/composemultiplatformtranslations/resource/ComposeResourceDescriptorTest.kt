@@ -19,6 +19,17 @@ class ComposeResourceDescriptorTest : BasePlatformTestCase() {
         assertEquals("composeResources", descriptor?.resourceRoot?.name)
     }
 
+    fun testExtractsModuleNameFromResourcePath() {
+        val file = myFixture.tempDirFixture.createFile(
+            "feature/src/commonMain/composeResources/values/strings.xml",
+            "<resources />",
+        )
+
+        val descriptor = ComposeResourceDescriptor.from(file)
+
+        assertEquals("feature", descriptor?.moduleName)
+    }
+
     fun testRejectsAndroidResStringsFile() {
         val file = myFixture.tempDirFixture.createFile(
             "src/main/res/values-ko/strings.xml",

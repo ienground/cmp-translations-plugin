@@ -13,6 +13,7 @@ data class ComposeResourceDocument(
 
 data class ComposeResourceSet(
     val resourceRoot: VirtualFile,
+    val moduleName: String,
     val sourceSetName: String,
     val documents: List<ComposeResourceDocument>,
 ) {
@@ -48,10 +49,11 @@ class ComposeResourceCatalog(
                 val first = groupedDocuments.first()
                 ComposeResourceSet(
                     resourceRoot = first.descriptor.resourceRoot,
+                    moduleName = first.descriptor.moduleName,
                     sourceSetName = first.descriptor.sourceSetName,
                     documents = groupedDocuments.sortedBy { it.descriptor.qualifier.rawValue },
                 )
             }
-            .sortedWith(compareBy({ it.sourceSetName != "commonMain" }, { it.sourceSetName }, { it.resourceRoot.url }))
+            .sortedWith(compareBy({ it.sourceSetName != "commonMain" }, { it.moduleName }, { it.sourceSetName }, { it.resourceRoot.url }))
     }
 }
