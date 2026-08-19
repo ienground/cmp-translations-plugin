@@ -49,6 +49,7 @@ class ComposeResourceWriter(private val project: Project) {
         key: String,
         defaultValue: String,
         localizedValues: Map<ComposeResourceQualifier, String>,
+        translatable: Boolean = true,
     ): Boolean = runWriteCommand {
         val defaultDocument = resourceSet.defaultDocument ?: return@runWriteCommand false
         val defaultFile = findXmlFile(defaultDocument) ?: return@runWriteCommand false
@@ -59,7 +60,7 @@ class ComposeResourceWriter(private val project: Project) {
         }
         if (localeFiles.size != resourceSet.localizedDocuments.size) return@runWriteCommand false
 
-        addTag(defaultFile, key, defaultValue)
+        addTag(defaultFile, key, defaultValue, translatable)
         localeFiles.forEach { (qualifier, file) ->
             val value = localizedValues[qualifier]?.takeIf(String::isNotBlank) ?: return@forEach
             val existingTag = findStringTag(file, key)
@@ -104,7 +105,7 @@ class ComposeResourceWriter(private val project: Project) {
     private fun findStringTag(file: XmlFile, key: String): XmlTag? =
         file.rootTag?.findSubTags("string")?.firstOrNull { it.getAttributeValue("name") == key }
 
-    private fun addTag(file: XmlFile, key: String, value: String): Boolean {
+    private fun addTag(file: XmlFile, key: String, value: String, translatable: Boolean = true): Boolean {
         val rootTag = file.rootTag ?: return false
         val newTag = XmlElementFactory.getInstance(project).createTagFromText("<string name=\"resource\" />")
         newTag.setAttribute("name", key)
@@ -112,6 +113,18 @@ class ComposeResourceWriter(private val project: Project) {
         rootTag.addSubTag(newTag, false)
         return true
     }
+
+    fun setTranslatable(document: ComposeResourceDocument, key: String, translatable: Boolean): Boolean =
+        runWriteCommand {
+            val xmlFile = findXmlFile(document) ?: return@runWriteCommand false
+            val tag = findStringTag(xmlFile, key) ?: return@runWriteCommand false
+            if (translatable) {
+                tag.setAttribute("translatable", null)
+            } else {
+                tag.setAttribute("translatable", "false")
+            }
+            true
+        }
 
     private fun <T> runWriteCommand(action: () -> T): T {
         var result: T? = null

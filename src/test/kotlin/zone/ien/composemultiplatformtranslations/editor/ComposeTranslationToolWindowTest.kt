@@ -12,6 +12,7 @@ import java.awt.Font
 import java.awt.FontMetrics
 import java.awt.Insets
 import java.awt.image.BufferedImage
+import java.awt.event.MouseEvent
 import javax.swing.JButton
 import javax.swing.JComboBox
 import javax.swing.JList
@@ -21,6 +22,7 @@ import javax.swing.JPanel
 import javax.swing.JTable
 import javax.swing.JTextField
 import javax.swing.SwingUtilities
+import java.util.concurrent.atomic.AtomicReference
 import zone.ien.composemultiplatformtranslations.MyBundle
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -273,6 +275,27 @@ class ComposeTranslationToolWindowTest : BasePlatformTestCase() {
         assertTrue(table.editCellAt(0, 0))
         table.removeEditor()
     }
+
+    fun testKeyEditFromEdtDoesNotThrowDuringReload() {
+        createResourceFiles()
+
+        val content = ComposeTranslationToolWindow(project).component
+        val table = descendants(content).filterIsInstance<JTable>().single()
+        val failure = AtomicReference<Throwable?>()
+        val edit = {
+            try {
+                table.setValueAt("sign_in", 0, 0)
+            } catch (throwable: Throwable) {
+                failure.set(throwable)
+            }
+        }
+
+        if (SwingUtilities.isEventDispatchThread()) edit() else SwingUtilities.invokeAndWait(edit)
+
+        assertEquals(null, failure.get())
+    }
+
+
 
     fun testTableUsesMonospaceFontAndVisibleGrid() {
         createResourceFiles()

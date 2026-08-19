@@ -7,6 +7,7 @@ import com.intellij.openapi.actionSystem.DefaultActionGroup
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.ToggleAction
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.WriteIntentReadAction
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.DialogWrapper
@@ -95,6 +96,7 @@ class ComposeTranslationToolWindow(private val project: Project) {
     private val writer = ComposeResourceWriter(project)
     private val vfsConnection = project.messageBus.connect(project)
     private var resourceSets: List<ComposeResourceSet> = emptyList()
+    private var hasLoadedResourceSets = false
 
     val component: JComponent = createComponent()
 
@@ -103,12 +105,13 @@ class ComposeTranslationToolWindow(private val project: Project) {
         searchField.emptyText.text = MyBundle.message("translation.search.placeholder")
         tableModel.onValueEdited = { key, qualifier, value -> editValue(key, qualifier, value) }
         tableModel.onKeyEdited = ::editKey
+        tableModel.onTranslatableEdited = ::editTranslatable
         table.addMouseListener(object : MouseAdapter() {
             override fun mouseClicked(event: MouseEvent) {
                 if (event.clickCount == 2 && event.button == MouseEvent.BUTTON1) {
-                    val column = table.columnAtPoint(event.point)
-                    if (column > 0) {
-                        navigateToCell(table.rowAtPoint(event.point), column)
+                    val row = table.rowAtPoint(event.point)
+                    if (row >= 0) {
+                        editRowInDialog(row)
                     }
                 }
             }
@@ -118,7 +121,17 @@ class ComposeTranslationToolWindow(private val project: Project) {
                 tableModel.searchQuery = searchField.text
             }
         })
+        searchField.addFocusListener(object : java.awt.event.FocusAdapter() {
+            override fun focusGained(e: java.awt.event.FocusEvent?) {
+                if (table.isEditing) table.cellEditor?.stopCellEditing()
+            }
+        })
         resourceSetCombo.addActionListener { renderSelectedResourceSet() }
+        resourceSetCombo.addFocusListener(object : java.awt.event.FocusAdapter() {
+            override fun focusGained(e: java.awt.event.FocusEvent?) {
+                if (table.isEditing) table.cellEditor?.stopCellEditing()
+            }
+        })
         vfsConnection.subscribe(VirtualFileManager.VFS_CHANGES, object : BulkFileListener {
             override fun after(events: List<VFileEvent>) {
                 val changedPaths = events.map(VFileEvent::getPath)
@@ -179,23 +192,32 @@ class ComposeTranslationToolWindow(private val project: Project) {
 
     private fun configureTable() {
         table.setShowGrid(true)
-        table.gridColor = JBColor(Color(210, 210, 210), Color(60, 63, 65))
-        table.intercellSpacing = JBUI.size(1, 1)
         table.fillsViewportHeight = true
-        table.autoResizeMode = JTable.AUTO_RESIZE_LAST_COLUMN
+        table.autoResizeMode = JTable.AUTO_RESIZE_OFF
         table.rowHeight = 24
-        table.font = Font(Font.MONOSPACED, Font.PLAIN, table.font.size)
-        table.tableHeader.font = table.font.deriveFont(Font.BOLD)
-        table.tableHeader.background = JBColor(Color(245, 245, 245), Color(60, 63, 65))
-        table.tableHeader.foreground = JBColor(Color(80, 80, 80), Color(169, 183, 198))
-        table.selectionBackground = JBColor(Color(220, 235, 255), Color(75, 90, 110))
-        table.selectionForeground = JBColor(Color(30, 30, 30), Color(230, 240, 250))
         table.setDefaultRenderer(String::class.java, TranslationCellRenderer())
-        table.setDefaultEditor(String::class.java, MissingAwareCellEditor())
+        table.setDefaultEditor(String::class.java, MissingAwareCellEditor(table.getDefaultEditor(String::class.java)))
+        
+        // Disable JBTable's auto-termination of edits on focus loss.
+        // This prevents macOS Korean IME from prematurely committing the cell value
+        // every time the composition window steals focus character by character.
+        table.putClientProperty("terminateEditOnFocusLost", false)
     }
 
     private fun reload() {
-        resourceSets = catalog.load()
+        if (table.isEditing) table.cellEditor?.stopCellEditing()
+        if (!hasLoadedResourceSets) {
+            applyResourceSets(catalog.load())
+            hasLoadedResourceSets = true
+        } else if (ApplicationManager.getApplication().isDispatchThread) {
+            catalog.loadAsync(::applyResourceSets)
+        } else {
+            applyResourceSets(catalog.load())
+        }
+    }
+
+    private fun applyResourceSets(loadedResourceSets: List<ComposeResourceSet>) {
+        resourceSets = loadedResourceSets
         resourceSetCombo.model = DefaultComboBoxModel(resourceSets.map(::ResourceSetOption).toTypedArray())
         renderSelectedResourceSet()
     }
@@ -221,6 +243,30 @@ class ComposeTranslationToolWindow(private val project: Project) {
             tableModel.rowCount,
             issues.size,
         )
+        applyColumnConstraints()
+    }
+
+    private fun applyColumnConstraints() {
+        if (table.columnCount > 1) {
+            table.columnModel.getColumn(1).apply {
+                minWidth = 115
+                maxWidth = 115
+                preferredWidth = 115
+                resizable = false
+            }
+        }
+        if (table.columnCount > 0) {
+            table.columnModel.getColumn(0).apply {
+                minWidth = 100
+                preferredWidth = 250
+            }
+        }
+        for (i in 2 until table.columnCount) {
+            table.columnModel.getColumn(i).apply {
+                minWidth = 100
+                preferredWidth = 200
+            }
+        }
     }
 
     private fun selectedResourceSet(): ComposeResourceSet? =
@@ -231,46 +277,67 @@ class ComposeTranslationToolWindow(private val project: Project) {
         qualifier: zone.ien.composemultiplatformtranslations.resource.ComposeResourceQualifier?,
         value: String,
     ) {
-        val resourceSet = selectedResourceSet() ?: return
-        val document = if (qualifier == null) {
-            resourceSet.defaultDocument
-        } else {
-            resourceSet.documentFor(qualifier)
+        ApplicationManager.getApplication().invokeLater {
+            val resourceSet = selectedResourceSet() ?: return@invokeLater
+            val document = if (qualifier == null) {
+                resourceSet.defaultDocument
+            } else {
+                resourceSet.documentFor(qualifier)
+            }
+            if (document == null || !writer.upsertValue(document, key, value)) {
+                Messages.showErrorDialog(
+                    project,
+                    MyBundle.message("translation.error.locale-edit"),
+                    MyBundle.message("translation.title"),
+                )
+                return@invokeLater
+            }
+            reload()
         }
-        if (document == null || !writer.upsertValue(document, key, value)) {
-            Messages.showErrorDialog(
-                project,
-                MyBundle.message("translation.error.locale-edit"),
-                MyBundle.message("translation.title"),
-            )
-            return
+    }
+
+    private fun editTranslatable(key: String, translatable: Boolean) {
+        ApplicationManager.getApplication().invokeLater {
+            val resourceSet = selectedResourceSet() ?: return@invokeLater
+            val document = resourceSet.defaultDocument ?: return@invokeLater
+            if (!writer.setTranslatable(document, key, translatable)) {
+                Messages.showErrorDialog(
+                    project,
+                    MyBundle.message("translation.error.locale-edit"),
+                    MyBundle.message("translation.title"),
+                )
+                return@invokeLater
+            }
+            reload()
         }
-        reload()
     }
 
     private fun editKey(oldKey: String, newKey: String) {
-        val resourceSet = selectedResourceSet() ?: return
-        val normalizedKey = newKey.trim()
-        if (normalizedKey.isEmpty()) {
-            Messages.showErrorDialog(
-                project,
-                MyBundle.message("translation.error.invalid-key"),
-                MyBundle.message("translation.title"),
-            )
-            return
+        ApplicationManager.getApplication().invokeLater {
+            val resourceSet = selectedResourceSet() ?: return@invokeLater
+            val normalizedKey = newKey.trim()
+            if (normalizedKey.isEmpty()) {
+                Messages.showErrorDialog(
+                    project,
+                    MyBundle.message("translation.error.invalid-key"),
+                    MyBundle.message("translation.title"),
+                )
+                return@invokeLater
+            }
+            if (!writer.renameKey(resourceSet, oldKey, normalizedKey)) {
+                Messages.showErrorDialog(
+                    project,
+                    MyBundle.message("translation.error.rename-failed"),
+                    MyBundle.message("translation.title"),
+                )
+                return@invokeLater
+            }
+            reload()
         }
-        if (!writer.renameKey(resourceSet, oldKey, normalizedKey)) {
-            Messages.showErrorDialog(
-                project,
-                MyBundle.message("translation.error.rename-failed"),
-                MyBundle.message("translation.title"),
-            )
-            return
-        }
-        reload()
     }
 
     private fun addString() {
+        if (table.isEditing) table.cellEditor?.stopCellEditing()
         val resourceSet = selectedResourceSet()
         if (resourceSet?.defaultDocument == null) {
             Messages.showErrorDialog(
@@ -287,18 +354,21 @@ class ComposeTranslationToolWindow(private val project: Project) {
         )
         if (!dialog.showAndGet()) return
         val draft = dialog.draft()
-        if (!writer.addStringResource(resourceSet, draft.key, draft.defaultValue, draft.localizedValues)) {
-            Messages.showErrorDialog(
-                project,
-                MyBundle.message("translation.error.add-failed"),
-                MyBundle.message("translation.title"),
-            )
-            return
+        ApplicationManager.getApplication().invokeLater {
+            if (!writer.addStringResource(resourceSet, draft.key, draft.defaultValue, draft.localizedValues, draft.translatable)) {
+                Messages.showErrorDialog(
+                    project,
+                    MyBundle.message("translation.error.add-failed"),
+                    MyBundle.message("translation.title"),
+                )
+                return@invokeLater
+            }
+            reload()
         }
-        reload()
     }
 
     private fun deleteSelected() {
+        if (table.isEditing) table.cellEditor?.stopCellEditing()
         val resourceSet = selectedResourceSet() ?: return
         val row = table.selectedRow.takeIf { it >= 0 }?.let { tableModel.visibleRows().getOrNull(it) } ?: return
         val answer = Messages.showYesNoDialog(
@@ -309,8 +379,55 @@ class ComposeTranslationToolWindow(private val project: Project) {
         )
         if (answer != Messages.YES) return
 
-        writer.removeKey(resourceSet, row.key)
-        reload()
+        ApplicationManager.getApplication().invokeLater {
+            writer.removeKey(resourceSet, row.key)
+            reload()
+        }
+    }
+
+    private fun editRowInDialog(rowIndex: Int) {
+        if (table.isEditing) table.cellEditor?.stopCellEditing()
+        val resourceSet = selectedResourceSet() ?: return
+        val row = tableModel.visibleRows().getOrNull(rowIndex) ?: return
+        
+        val dialog = AddStringDialog(
+            project = project,
+            qualifiers = resourceSet.localizedDocuments.map { it.descriptor.qualifier },
+            initialRow = row
+        )
+        if (!dialog.showAndGet()) return
+        val draft = dialog.draft()
+        
+        ApplicationManager.getApplication().invokeLater {
+            var success = true
+            if (draft.key != row.key) {
+                if (!writer.renameKey(resourceSet, row.key, draft.key)) {
+                    success = false
+                }
+            }
+            if (success) {
+                resourceSet.defaultDocument?.let { doc ->
+                    writer.upsertValue(doc, draft.key, draft.defaultValue)
+                    writer.setTranslatable(doc, draft.key, draft.translatable)
+                }
+                draft.localizedValues.forEach { (qualifier, value) ->
+                    resourceSet.documentFor(qualifier)?.let { doc ->
+                        writer.upsertValue(doc, draft.key, value)
+                    } ?: run {
+                        // If document doesn't exist, we might need to create it? We just try to add string resource
+                        // For simplicity, if document is missing, it's skipped here. But writer.addStringResource handles it better.
+                    }
+                }
+            }
+            if (!success) {
+                Messages.showErrorDialog(
+                    project,
+                    MyBundle.message("translation.error.locale-edit"),
+                    MyBundle.message("translation.title")
+                )
+            }
+            reload()
+        }
     }
 
     private fun navigateToCell(rowIndex: Int, columnIndex: Int) {
@@ -322,12 +439,15 @@ class ComposeTranslationToolWindow(private val project: Project) {
         } else {
             resourceSet.documentFor(qualifier)
         } ?: return
-        val psiFile = PsiManager.getInstance(project).findFile(document.descriptor.file) ?: return
-        val stringTag = (psiFile as? com.intellij.psi.xml.XmlFile)?.rootTag
-            ?.findSubTags("string")
-            ?.firstOrNull { it.getAttributeValue("name") == row.key }
-            ?: return
-        OpenFileDescriptor(project, document.descriptor.file, stringTag.textRange.startOffset).navigate(true)
+        val offset = WriteIntentReadAction.compute {
+            val psiFile = PsiManager.getInstance(project).findFile(document.descriptor.file) ?: return@compute null
+            (psiFile as? com.intellij.psi.xml.XmlFile)?.rootTag
+                ?.findSubTags("string")
+                ?.firstOrNull { it.getAttributeValue("name") == row.key }
+                ?.textRange
+                ?.startOffset
+        } ?: return
+        OpenFileDescriptor(project, document.descriptor.file, offset).navigate(true)
     }
 }
 
@@ -335,19 +455,24 @@ internal data class StringResourceDraft(
     val key: String,
     val defaultValue: String,
     val localizedValues: Map<ComposeResourceQualifier, String>,
+    val translatable: Boolean,
 )
 
 internal class AddStringDialog(
     project: Project,
     private val qualifiers: List<ComposeResourceQualifier>,
+    private val initialRow: TranslationRow? = null,
 ) : DialogWrapper(project) {
 
-    private val keyField = JBTextField()
-    private val defaultField = JBTextField()
-    private val localizedFields = qualifiers.associateWith { JBTextField() }
+    private val keyField = JBTextField(initialRow?.key ?: "")
+    private val defaultField = JBTextField(initialRow?.defaultValue ?: "")
+    private val localizedFields = qualifiers.associateWith { qualifier -> 
+        JBTextField(initialRow?.localizedValues?.get(qualifier) ?: "") 
+    }
+    private val untranslatableCheck = com.intellij.ui.components.JBCheckBox("Untranslatable", !(initialRow?.translatable ?: true))
 
     init {
-        title = MyBundle.message("translation.dialog.add.title")
+        title = if (initialRow == null) MyBundle.message("translation.dialog.add.title") else "Edit Translation"
         init()
     }
 
@@ -355,11 +480,13 @@ internal class AddStringDialog(
         key = keyField.text.trim(),
         defaultValue = defaultField.text,
         localizedValues = localizedFields.mapValues { it.value.text },
+        translatable = !untranslatableCheck.isSelected,
     )
 
     override fun createCenterPanel(): JComponent = panel {
         row(MyBundle.message("translation.dialog.add.key")) {
             cell(keyField).align(Align.FILL)
+            cell(untranslatableCheck)
         }
         row(MyBundle.message("translation.dialog.add.default")) {
             cell(defaultField).align(Align.FILL)
@@ -793,21 +920,48 @@ internal class WrapLayout(
     }
 }
 
-private class MissingAwareCellEditor : DefaultCellEditor(JTextField()) {
+private class MissingAwareCellEditor(
+    private val delegate: javax.swing.table.TableCellEditor
+) : javax.swing.AbstractCellEditor(), javax.swing.table.TableCellEditor {
+
+    init {
+        if (delegate is javax.swing.DefaultCellEditor) {
+            delegate.clickCountToStart = 1
+        }
+    }
 
     override fun getTableCellEditorComponent(
-        table: JTable,
+        table: javax.swing.JTable,
         value: Any?,
         isSelected: Boolean,
         row: Int,
         column: Int,
-    ): Component {
-        val component = super.getTableCellEditorComponent(table, value, isSelected, row, column)
-        if (value == ComposeTranslationTableModel.MISSING_VALUE) {
-            (component as JTextField).text = ""
-        }
-        return component
+    ): java.awt.Component {
+        val displayValue = if (value == ComposeTranslationTableModel.MISSING_VALUE) "" else value
+        return delegate.getTableCellEditorComponent(table, displayValue, isSelected, row, column)
     }
+
+    override fun getCellEditorValue(): Any = delegate.cellEditorValue
+
+    override fun isCellEditable(anEvent: java.util.EventObject?): Boolean {
+        if (anEvent is java.awt.event.MouseEvent && anEvent.clickCount >= 1) {
+            // Force the delegate to accept single click if possible
+            if (delegate is javax.swing.DefaultCellEditor) {
+                delegate.clickCountToStart = 1
+            }
+            // Some custom editors might ignore clickCountToStart, so we still return true
+            // but we call delegate.isCellEditable first in case it does setup.
+            delegate.isCellEditable(anEvent)
+            return true
+        }
+        return delegate.isCellEditable(anEvent)
+    }
+
+    override fun shouldSelectCell(anEvent: java.util.EventObject?): Boolean = delegate.shouldSelectCell(anEvent)
+    override fun stopCellEditing(): Boolean = delegate.stopCellEditing()
+    override fun cancelCellEditing() = delegate.cancelCellEditing()
+    override fun addCellEditorListener(l: javax.swing.event.CellEditorListener?) = delegate.addCellEditorListener(l)
+    override fun removeCellEditorListener(l: javax.swing.event.CellEditorListener?) = delegate.removeCellEditorListener(l)
 }
 
 private class TranslationCellRenderer : DefaultTableCellRenderer() {

@@ -1,6 +1,8 @@
 package zone.ien.composemultiplatformtranslations.resource
 
 import com.intellij.openapi.application.ReadAction
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.application.ModalityState
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiManager
@@ -37,13 +39,30 @@ class ComposeResourceCatalog(
 ) {
 
     fun load(): List<ComposeResourceSet> = ReadAction.nonBlocking(Callable {
+        loadInReadAction()
+    }).executeSynchronously()
+
+    fun loadAsync(onLoaded: (List<ComposeResourceSet>) -> Unit) {
+        ApplicationManager.getApplication().executeOnPooledThread {
+            val resourceSets = load()
+            if (project.isDisposed) return@executeOnPooledThread
+            ApplicationManager.getApplication().invokeLater(
+                {
+                    if (!project.isDisposed) onLoaded(resourceSets)
+                },
+                ModalityState.defaultModalityState(),
+            )
+        }
+    }
+
+    private fun loadInReadAction(): List<ComposeResourceSet> {
         val psiManager = PsiManager.getInstance(project)
         val documents = locator.findFiles().mapNotNull { descriptor ->
             val xmlFile = psiManager.findFile(descriptor.file) as? XmlFile ?: return@mapNotNull null
             ComposeResourceDocument(descriptor, parser.parse(xmlFile))
         }
 
-        documents
+        return documents
             .groupBy { it.descriptor.resourceRoot.url }
             .values
             .map { groupedDocuments ->
@@ -56,5 +75,5 @@ class ComposeResourceCatalog(
                 )
             }
             .sortedWith(compareBy({ it.sourceSetName != "commonMain" }, { it.moduleName }, { it.sourceSetName }, { it.resourceRoot.url }))
-    }).executeSynchronously()
+    }
 }

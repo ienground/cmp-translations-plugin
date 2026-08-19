@@ -23,11 +23,12 @@ data class TranslationRow(
     val defaultValue: String?,
     val localizedValues: Map<ComposeResourceQualifier, String?>,
     val issues: List<ComposeResourceIssue>,
+    val translatable: Boolean = true,
 ) {
 
     val isComplete: Boolean
         get() = defaultValue?.isNotBlank() == true &&
-            localizedValues.values.all { !it.isNullOrBlank() } &&
+            (!translatable || localizedValues.values.all { !it.isNullOrBlank() }) &&
             issues.isEmpty()
 
     val isMissing: Boolean
@@ -42,6 +43,7 @@ class ComposeTranslationTableModel : AbstractTableModel() {
 
     var onValueEdited: ((key: String, qualifier: ComposeResourceQualifier?, value: String) -> Unit)? = null
     var onKeyEdited: ((oldKey: String, newKey: String) -> Unit)? = null
+    var onTranslatableEdited: ((key: String, translatable: Boolean) -> Unit)? = null
 
     var filter: TranslationFilter = TranslationFilter.ALL
         set(value) {
@@ -57,22 +59,27 @@ class ComposeTranslationTableModel : AbstractTableModel() {
 
     override fun getRowCount(): Int = visibleRows().size
 
-    override fun getColumnCount(): Int = 2 + qualifiers.size
+    override fun getColumnCount(): Int = 3 + qualifiers.size
 
     override fun getColumnName(column: Int): String = when (column) {
         0 -> MyBundle.message("translation.table.key")
-        1 -> MyBundle.message("translation.table.default")
-        else -> qualifiers[column - 2].displayName
+        1 -> "Untranslatable"
+        2 -> MyBundle.message("translation.table.default")
+        else -> qualifiers[column - 3].displayName
     }
 
-    override fun getColumnClass(columnIndex: Int): Class<*> = String::class.java
+    override fun getColumnClass(columnIndex: Int): Class<*> = when (columnIndex) {
+        1 -> java.lang.Boolean::class.java
+        else -> String::class.java
+    }
 
     override fun getValueAt(rowIndex: Int, columnIndex: Int): Any {
         val row = visibleRows()[rowIndex]
         return when (columnIndex) {
             0 -> row.key
-            1 -> row.defaultValue ?: MISSING_VALUE
-            else -> row.localizedValues[qualifiers[columnIndex - 2]] ?: MISSING_VALUE
+            1 -> !row.translatable
+            2 -> row.defaultValue ?: MISSING_VALUE
+            else -> row.localizedValues[qualifiers[columnIndex - 3]] ?: MISSING_VALUE
         }
     }
 
@@ -85,7 +92,12 @@ class ComposeTranslationTableModel : AbstractTableModel() {
             onKeyEdited?.invoke(row.key, value?.toString().orEmpty())
             return
         }
-        val qualifier = if (columnIndex == 1) null else qualifiers.getOrNull(columnIndex - 2)
+        if (columnIndex == 1) {
+            val isUntranslatable = value as? Boolean ?: false
+            onTranslatableEdited?.invoke(row.key, !isUntranslatable)
+            return
+        }
+        val qualifier = if (columnIndex == 2) null else qualifiers.getOrNull(columnIndex - 3)
         onValueEdited?.invoke(row.key, qualifier, value?.toString().orEmpty())
     }
 
@@ -113,6 +125,7 @@ class ComposeTranslationTableModel : AbstractTableModel() {
                     localizedByQualifier[qualifier]?.get(key)?.value
                 },
                 issues = issuesByKey[key].orEmpty(),
+                translatable = defaultByKey[key]?.translatable ?: true,
             )
         }
         fireTableStructureChanged()
@@ -128,7 +141,7 @@ class ComposeTranslationTableModel : AbstractTableModel() {
     }
 
     fun qualifierAtColumn(columnIndex: Int): ComposeResourceQualifier? =
-        if (columnIndex < 2) null else qualifiers.getOrNull(columnIndex - 2)
+        if (columnIndex < 3) null else qualifiers.getOrNull(columnIndex - 3)
 
     private fun TranslationRow.matches(query: String): Boolean {
         val normalizedQuery = query.trim().lowercase(Locale.ROOT)

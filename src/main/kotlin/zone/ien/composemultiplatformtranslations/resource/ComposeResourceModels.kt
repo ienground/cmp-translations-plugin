@@ -4,6 +4,7 @@ package zone.ien.composemultiplatformtranslations.resource
 data class ComposeStringEntry(
     val key: String,
     val value: String,
+    val translatable: Boolean = true,
     val placeholders: List<String> = ComposeStringPlaceholders.extract(value),
 )
 

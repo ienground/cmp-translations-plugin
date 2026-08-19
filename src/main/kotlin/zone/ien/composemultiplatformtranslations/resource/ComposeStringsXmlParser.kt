@@ -10,7 +10,8 @@ class ComposeStringsXmlParser {
             ?.findSubTags("string")
             ?.mapNotNull { tag ->
                 tag.getAttributeValue("name")?.let { key ->
-                    ComposeStringEntry(key = key, value = tag.value.text)
+                    val translatable = tag.getAttributeValue("translatable") != "false"
+                    ComposeStringEntry(key = key, value = tag.value.text, translatable = translatable)
                 }
             }
             .orEmpty()

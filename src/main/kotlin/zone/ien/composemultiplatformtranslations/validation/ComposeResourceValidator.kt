@@ -36,7 +36,9 @@ class ComposeResourceValidator {
         localizedEntries.forEach { (qualifier, entries) ->
             val localizedByKey = entries.associateBy(ComposeStringEntry::key)
 
-            defaultByKey.keys
+            defaultByKey.values
+                .filter { it.translatable }
+                .map { it.key }
                 .filterNot(localizedByKey::containsKey)
                 .forEach { key ->
                     issues += ComposeResourceIssue(
