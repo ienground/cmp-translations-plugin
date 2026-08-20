@@ -62,7 +62,7 @@ GitHub Actions가 빌드·테스트·Plugin Verifier를 통과한 뒤 GitHub Rel
 4. `beta` custom release channel을 선택합니다.
 5. 플러그인 설명·태그·스크린샷·지원 링크를 입력하고 검토를 요청합니다.
 
-플러그인 XML ID는 `zone.ien.composemultiplatformtranslations`입니다. 첫 업로드 후 Marketplace에서 발급한 영구 토큰과 서명 정보를 GitHub 저장소의 `Settings > Secrets and variables > Actions`에 다음 이름으로 등록합니다.
+플러그인 XML ID는 `zone.ien.cmp_translation_plugin`입니다. 첫 업로드 후 Marketplace에서 발급한 영구 토큰과 서명 정보를 GitHub 저장소의 `Settings > Secrets and variables > Actions`에 다음 이름으로 등록합니다.
 
 | Secret | 용도 |
 | --- | --- |

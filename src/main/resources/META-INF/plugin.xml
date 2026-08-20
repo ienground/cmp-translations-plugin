@@ -1,6 +1,6 @@
 <!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
 <idea-plugin url="https://github.com/ienground/cmp-translations-plugin">
-    <id>zone.ien.composemultiplatformtranslations</id>
+    <id>zone.ien.cmp_translation_plugin</id>
     <name>Compose Multiplatform Translations</name>
     <vendor>IENLAB</vendor>
     <description><![CDATA[
@@ -13,6 +13,13 @@
     <resource-bundle>messages.MyBundle</resource-bundle>
 
     <extensions defaultExtensionNs="com.intellij">
-        <toolWindow factoryClass="zone.ien.composemultiplatformtranslations.toolWindow.MyToolWindowFactory" id="ComposeTranslations"/>
+        <iconMapper mappingFile="ComposeMultiplatformTranslationsIconMappings.json"/>
+        <toolWindow
+                doNotActivateOnStart="false"
+                factoryClass="zone.ien.cmp_translation_plugin.toolWindow.MyToolWindowFactory"
+                id="ComposeTranslationPlugin"
+                displayName="Compose Translations"
+                icon="icons/toolWindowIcon.svg"
+        />
     </extensions>
 </idea-plugin>
