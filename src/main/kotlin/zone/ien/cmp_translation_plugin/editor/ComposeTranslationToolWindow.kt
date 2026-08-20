@@ -185,11 +185,11 @@ class ComposeTranslationToolWindow(private val project: Project) {
                     .align(Align.FILL)
                     .resizableColumn()
                 
-                val githubLink = ActionLink("@ienlab") {
-                    BrowserUtil.browse("https://github.com/ienlab")
+                val githubLink = ActionLink("@ienground") {
+                    BrowserUtil.browse("https://github.com/ienground")
                 }.apply {
-                    font = font.deriveFont(java.awt.Font.PLAIN, font.size - 1f)
-                    foreground = com.intellij.util.ui.JBUI.CurrentTheme.Link.Foreground.ENABLED
+                    font = font.deriveFont(Font.PLAIN, font.size - 1f)
+                    foreground = JBUI.CurrentTheme.Link.Foreground.ENABLED
                 }
                 cell(githubLink).align(AlignX.RIGHT)
             }
