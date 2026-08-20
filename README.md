@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://plugins.jetbrains.com"><img src="https://img.shields.io/badge/JetBrains%20Marketplace-v0.2.0%20(beta)-blue?logo=jetbrains" alt="JetBrains Marketplace" /></a>
+  <a href="https://plugins.jetbrains.com"><img src="https://img.shields.io/badge/JetBrains%20Marketplace-v0.4.0%20(beta)-blue?logo=jetbrains" alt="JetBrains Marketplace" /></a>
   <a href="https://kotlinlang.org"><img src="https://img.shields.io/badge/Kotlin-2.1.0-blue?logo=kotlin" alt="Kotlin" /></a>
   <a href="https://www.jetbrains.com/idea/"><img src="https://img.shields.io/badge/IDE-IntelliJ%20IDEA%20%7C%20Android%20Studio-green?logo=intellijidea" alt="Supported IDEs" /></a>
   <a href="https://plugins.jetbrains.com/docs/intellij/build-number-ranges.html"><img src="https://img.shields.io/badge/Compatible%20Build-2024.2+-orange?logo=jetbrains" alt="Compatibility" /></a>

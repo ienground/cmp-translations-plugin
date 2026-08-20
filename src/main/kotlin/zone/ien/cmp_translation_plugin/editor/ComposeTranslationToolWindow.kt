@@ -15,6 +15,7 @@ import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.ui.ValidationInfo
 import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.ui.popup.JBPopupFactory
+import com.intellij.openapi.util.Computable
 import com.intellij.openapi.vfs.VirtualFileManager
 import com.intellij.openapi.vfs.newvfs.BulkFileListener
 import com.intellij.openapi.vfs.newvfs.events.VFileEvent
@@ -416,33 +417,14 @@ class ComposeTranslationToolWindow(private val project: Project) {
         if (table.isEditing) table.cellEditor?.stopCellEditing()
         val resourceSet = selectedResourceSet() ?: return
         val row = tableModel.visibleRows().getOrNull(rowIndex) ?: return
-        
-        val dialog = AddStringDialog(
+
+        ComposeTranslationNavigation.showEditDialog(
             project = project,
-            qualifiers = resourceSet.localizedDocuments.map { it.descriptor.qualifier },
-            initialRow = row
+            resourceSet = resourceSet,
+            key = row.key,
+            writer = writer,
+            onUpdated = ::reload,
         )
-        if (!dialog.showAndGet()) return
-        val draft = dialog.draft()
-        
-        ApplicationManager.getApplication().invokeLater {
-            val success = writer.updateStringResource(
-                resourceSet = resourceSet,
-                oldKey = row.key,
-                newKey = draft.key,
-                defaultValue = draft.defaultValue,
-                localizedValues = draft.localizedValues,
-                translatable = draft.translatable,
-            )
-            if (!success) {
-                Messages.showErrorDialog(
-                    project,
-                    MyBundle.message("translation.error.locale-edit"),
-                    MyBundle.message("translation.title")
-                )
-            }
-            reload()
-        }
     }
 
     private fun navigateToCell(rowIndex: Int, columnIndex: Int) {
@@ -454,14 +436,18 @@ class ComposeTranslationToolWindow(private val project: Project) {
         } else {
             resourceSet.documentFor(qualifier)
         } ?: return
-        val offset = WriteIntentReadAction.compute {
-            val psiFile = PsiManager.getInstance(project).findFile(document.descriptor.file) ?: return@compute null
-            (psiFile as? com.intellij.psi.xml.XmlFile)?.rootTag
-                ?.findSubTags("string")
-                ?.firstOrNull { it.getAttributeValue("name") == row.key }
-                ?.textRange
-                ?.startOffset
-        } ?: return
+        val offset = WriteIntentReadAction.compute(Computable<Int?> {
+            val psiFile = PsiManager.getInstance(project).findFile(document.descriptor.file)
+            if (psiFile == null) {
+                null
+            } else {
+                (psiFile as? com.intellij.psi.xml.XmlFile)?.rootTag
+                    ?.findSubTags("string")
+                    ?.firstOrNull { it.getAttributeValue("name") == row.key }
+                    ?.textRange
+                    ?.startOffset
+            }
+        }) ?: return
         OpenFileDescriptor(project, document.descriptor.file, offset).navigate(true)
     }
 }

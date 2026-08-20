@@ -15,6 +15,7 @@
 
     <extensions defaultExtensionNs="com.intellij">
         <iconMapper mappingFile="ComposeMultiplatformTranslationsIconMappings.json"/>
+        <gotoDeclarationHandler implementation="zone.ien.cmp_translation_plugin.editor.ComposeTranslationGotoDeclarationHandler" order="first"/>
         <toolWindow
                 doNotActivateOnStart="false"
                 factoryClass="zone.ien.cmp_translation_plugin.toolWindow.MyToolWindowFactory"
