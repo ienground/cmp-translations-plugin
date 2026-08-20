@@ -99,6 +99,55 @@ class ComposeResourceWriter(private val project: Project) {
             }
         }
 
+    fun updateStringResource(
+        resourceSet: ComposeResourceSet,
+        oldKey: String,
+        newKey: String,
+        defaultValue: String,
+        localizedValues: Map<ComposeResourceQualifier, String>,
+        translatable: Boolean = true,
+    ): Boolean = runWriteCommand {
+        if (newKey.isBlank()) return@runWriteCommand false
+
+        if (oldKey != newKey) {
+            val files = resourceSet.documents.mapNotNull { document ->
+                findXmlFile(document)
+            }
+            if (files.size != resourceSet.documents.size) return@runWriteCommand false
+            if (files.any { file -> findStringTag(file, newKey) != null }) return@runWriteCommand false
+
+            files.forEach { file ->
+                findStringTag(file, oldKey)?.setAttribute("name", newKey)
+            }
+        }
+
+        val defaultDocument = resourceSet.defaultDocument ?: return@runWriteCommand false
+        val defaultFile = findXmlFile(defaultDocument) ?: return@runWriteCommand false
+        val defaultTag = findStringTag(defaultFile, newKey)
+        if (defaultTag != null) {
+            defaultTag.value.text = defaultValue
+            if (translatable) {
+                defaultTag.setAttribute("translatable", null)
+            } else {
+                defaultTag.setAttribute("translatable", "false")
+            }
+        } else {
+            addTag(defaultFile, newKey, defaultValue, translatable)
+        }
+
+        localizedValues.forEach { (qualifier, value) ->
+            val doc = resourceSet.documentFor(qualifier) ?: return@forEach
+            val file = findXmlFile(doc) ?: return@forEach
+            val tag = findStringTag(file, newKey)
+            if (tag != null) {
+                tag.value.text = value
+            } else if (value.isNotBlank()) {
+                addTag(file, newKey, value)
+            }
+        }
+        true
+    }
+
     private fun findXmlFile(document: ComposeResourceDocument): XmlFile? =
         PsiManager.getInstance(project).findFile(document.descriptor.file) as? XmlFile
 
@@ -109,6 +158,9 @@ class ComposeResourceWriter(private val project: Project) {
         val rootTag = file.rootTag ?: return false
         val newTag = XmlElementFactory.getInstance(project).createTagFromText("<string name=\"resource\" />")
         newTag.setAttribute("name", key)
+        if (!translatable) {
+            newTag.setAttribute("translatable", "false")
+        }
         newTag.value.text = value
         rootTag.addSubTag(newTag, false)
         return true

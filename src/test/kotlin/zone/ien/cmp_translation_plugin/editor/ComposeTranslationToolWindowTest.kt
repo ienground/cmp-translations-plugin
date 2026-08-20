@@ -316,14 +316,14 @@ class ComposeTranslationToolWindowTest : BasePlatformTestCase() {
 
         val content = ComposeTranslationToolWindow(project).component
         val table = descendants(content).filterIsInstance<JTable>().single()
-        val renderer = table.getCellRenderer(0, 2)
+        val renderer = table.getCellRenderer(0, 3)
         val rendered = renderer.getTableCellRendererComponent(
             table,
-            table.getValueAt(0, 2),
+            table.getValueAt(0, 3),
             false,
             false,
             0,
-            2,
+            3,
         )
 
         assertTrue(rendered is JPanel)
@@ -343,13 +343,13 @@ class ComposeTranslationToolWindowTest : BasePlatformTestCase() {
 
         val content = ComposeTranslationToolWindow(project).component
         val table = descendants(content).filterIsInstance<JTable>().single()
-        val editor = table.getCellEditor(0, 2)
+        val editor = table.getCellEditor(0, 3)
         val editorComponent = editor.getTableCellEditorComponent(
             table,
-            table.getValueAt(0, 2),
+            table.getValueAt(0, 3),
             true,
             0,
-            2,
+            3,
         ) as JTextField
 
         assertEquals("", editorComponent.text)

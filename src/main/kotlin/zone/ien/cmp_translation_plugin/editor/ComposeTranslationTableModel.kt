@@ -63,13 +63,13 @@ class ComposeTranslationTableModel : AbstractTableModel() {
 
     override fun getColumnName(column: Int): String = when (column) {
         0 -> MyBundle.message("translation.table.key")
-        1 -> "Untranslatable"
+        1 -> MyBundle.message("translation.table.untranslatable")
         2 -> MyBundle.message("translation.table.default")
         else -> qualifiers[column - 3].displayName
     }
 
     override fun getColumnClass(columnIndex: Int): Class<*> = when (columnIndex) {
-        1 -> java.lang.Boolean::class.java
+        1 -> Boolean::class.javaObjectType
         else -> String::class.java
     }
 

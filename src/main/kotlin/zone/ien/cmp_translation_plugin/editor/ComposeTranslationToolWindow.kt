@@ -202,6 +202,7 @@ class ComposeTranslationToolWindow(private val project: Project) {
     }
 
     private fun configureTable() {
+        table.font = Font(Font.MONOSPACED, Font.PLAIN, table.font.size)
         table.setShowGrid(true)
         table.fillsViewportHeight = true
         table.autoResizeMode = JTable.AUTO_RESIZE_SUBSEQUENT_COLUMNS
@@ -425,26 +426,14 @@ class ComposeTranslationToolWindow(private val project: Project) {
         val draft = dialog.draft()
         
         ApplicationManager.getApplication().invokeLater {
-            var success = true
-            if (draft.key != row.key) {
-                if (!writer.renameKey(resourceSet, row.key, draft.key)) {
-                    success = false
-                }
-            }
-            if (success) {
-                resourceSet.defaultDocument?.let { doc ->
-                    writer.upsertValue(doc, draft.key, draft.defaultValue)
-                    writer.setTranslatable(doc, draft.key, draft.translatable)
-                }
-                draft.localizedValues.forEach { (qualifier, value) ->
-                    resourceSet.documentFor(qualifier)?.let { doc ->
-                        writer.upsertValue(doc, draft.key, value)
-                    } ?: run {
-                        // If document doesn't exist, we might need to create it? We just try to add string resource
-                        // For simplicity, if document is missing, it's skipped here. But writer.addStringResource handles it better.
-                    }
-                }
-            }
+            val success = writer.updateStringResource(
+                resourceSet = resourceSet,
+                oldKey = row.key,
+                newKey = draft.key,
+                defaultValue = draft.defaultValue,
+                localizedValues = draft.localizedValues,
+                translatable = draft.translatable,
+            )
             if (!success) {
                 Messages.showErrorDialog(
                     project,
@@ -495,10 +484,17 @@ internal class AddStringDialog(
     private val localizedFields = qualifiers.associateWith { qualifier -> 
         JBTextField(initialRow?.localizedValues?.get(qualifier) ?: "") 
     }
-    private val untranslatableCheck = com.intellij.ui.components.JBCheckBox("Untranslatable", !(initialRow?.translatable ?: true))
+    private val untranslatableCheck = com.intellij.ui.components.JBCheckBox(
+        MyBundle.message("translation.dialog.add.untranslatable"),
+        !(initialRow?.translatable ?: true),
+    )
 
     init {
-        title = if (initialRow == null) MyBundle.message("translation.dialog.add.title") else "Edit Translation"
+        title = if (initialRow == null) {
+            MyBundle.message("translation.dialog.add.title")
+        } else {
+            MyBundle.message("translation.dialog.edit.title")
+        }
         init()
     }
 

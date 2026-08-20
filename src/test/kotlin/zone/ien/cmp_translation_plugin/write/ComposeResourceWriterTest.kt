@@ -93,6 +93,55 @@ class ComposeResourceWriterTest : BasePlatformTestCase() {
         assertEquals("프로필", findStringValue(resourceSet.documentFor(ComposeResourceQualifier("ko"))!!.descriptor.file, "profile_title"))
     }
 
+    fun testAddsUntranslatableStringResource() {
+        createFile("src/commonMain/composeResources/values/strings.xml", "<resources />")
+        val resourceSet = loadSet()
+
+        assertEquals(
+            true,
+            ComposeResourceWriter(project).addStringResource(
+                resourceSet = resourceSet,
+                key = "app_name",
+                defaultValue = "My App",
+                localizedValues = emptyMap(),
+                translatable = false,
+            ),
+        )
+        commitPsi()
+
+        val xmlFile = PsiManager.getInstance(project).findFile(resourceSet.defaultDocument!!.descriptor.file) as XmlFile
+        val tag = xmlFile.rootTag?.findSubTags("string")?.firstOrNull { it.getAttributeValue("name") == "app_name" }
+        assertEquals("false", tag?.getAttributeValue("translatable"))
+    }
+
+    fun testUpdatesStringResourceAtomically() {
+        createFile("src/commonMain/composeResources/values/strings.xml", "<resources><string name=\"login\">Login</string></resources>")
+        createFile("src/commonMain/composeResources/values-ko/strings.xml", "<resources><string name=\"login\">로그인</string></resources>")
+        val resourceSet = loadSet()
+
+        assertEquals(
+            true,
+            ComposeResourceWriter(project).updateStringResource(
+                resourceSet = resourceSet,
+                oldKey = "login",
+                newKey = "sign_in",
+                defaultValue = "Sign in",
+                localizedValues = mapOf(ComposeResourceQualifier("ko") to "로그인하기"),
+                translatable = false,
+            ),
+        )
+        commitPsi()
+
+        val defaultDoc = resourceSet.defaultDocument!!.descriptor.file
+        val koDoc = resourceSet.documentFor(ComposeResourceQualifier("ko"))!!.descriptor.file
+        assertEquals(null, findStringValue(defaultDoc, "login"))
+        assertEquals("Sign in", findStringValue(defaultDoc, "sign_in"))
+        val defaultXml = PsiManager.getInstance(project).findFile(defaultDoc) as XmlFile
+        val defaultTag = defaultXml.rootTag?.findSubTags("string")?.firstOrNull { it.getAttributeValue("name") == "sign_in" }
+        assertEquals("false", defaultTag?.getAttributeValue("translatable"))
+        assertEquals("로그인하기", findStringValue(koDoc, "sign_in"))
+    }
+
     private fun loadSet(): ComposeResourceSet = ComposeResourceCatalog(project).load().single()
 
     private fun createFile(path: String, text: String): VirtualFile =

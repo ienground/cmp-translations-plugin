@@ -30,10 +30,10 @@ class ComposeTranslationTableModelTest {
             issues = emptyList(),
         )
 
-        assertEquals(listOf("Key", "Default", "ja", "ko"), (0 until model.columnCount).map(model::getColumnName))
+        assertEquals(listOf("Key", "Untranslatable", "Default", "ja", "ko"), (0 until model.columnCount).map(model::getColumnName))
         assertEquals(2, model.rowCount)
-        assertEquals("My App", model.getValueAt(0, 1))
-        assertEquals("[Missing]", model.getValueAt(1, 2))
+        assertEquals("My App", model.getValueAt(0, 2))
+        assertEquals("[Missing]", model.getValueAt(1, 3))
     }
 
     @Test
@@ -65,7 +65,7 @@ class ComposeTranslationTableModelTest {
         model.filter = TranslationFilter.ALL
         model.searchQuery = "로그인"
         assertEquals(listOf("login"), model.visibleRows().map { it.key })
-        assertTrue(model.getValueAt(0, 3).toString().contains("로그인"))
+        assertTrue(model.getValueAt(0, 4).toString().contains("로그인"))
     }
 
     @Test
@@ -79,7 +79,7 @@ class ComposeTranslationTableModelTest {
             issues = emptyList(),
         )
 
-        model.setValueAt("로그인 버튼", 0, 2)
+        model.setValueAt("로그인 버튼", 0, 3)
 
         assertEquals(Triple("login", ko, "로그인 버튼"), edited)
     }
