@@ -1,9 +1,9 @@
-package com.github.ienground.cmptranslationsplugin.services
+package zone.ien.cmp_translation_plugin.services
 
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
-import com.github.ienground.cmptranslationsplugin.MyBundle
+import zone.ien.cmp_translation_plugin.MyBundle
 
 @Service(Service.Level.PROJECT)
 class MyProjectService(project: Project) {

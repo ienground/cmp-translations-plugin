@@ -1,7 +1,12 @@
-<!-- Keep a Changelog guide -> https://keepachangelog.com -->
-
-# cmp-translations-plugin Changelog
+# Compose Multiplatform Translations Changelog
 
 ## [Unreleased]
+
 ### Added
-- Initial scaffold created from [IntelliJ Platform Plugin Template](https://github.com/JetBrains/intellij-platform-plugin-template)
+
+- Automatically discover `composeResources` string resources and provide translation tables for each source set
+- Search translations and filter entries by `All`, `Missing`, or `Complete` status
+- Validate missing, orphan, and duplicate keys as well as printf-style placeholder mismatches
+- Add, edit, delete, and rename keys through XML PSI
+- Navigate from a translation cell to its source XML location
+- Detect resource changes and refresh the translation table manually

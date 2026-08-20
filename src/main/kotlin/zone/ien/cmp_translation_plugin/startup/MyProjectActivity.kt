@@ -1,4 +1,4 @@
-package com.github.ienground.cmptranslationsplugin.startup
+package zone.ien.cmp_translation_plugin.startup
 
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project

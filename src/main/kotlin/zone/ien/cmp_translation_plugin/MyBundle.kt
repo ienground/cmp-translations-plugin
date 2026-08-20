@@ -1,4 +1,4 @@
-package com.github.ienground.cmptranslationsplugin
+package zone.ien.cmp_translation_plugin
 
 import com.intellij.DynamicBundle
 import org.jetbrains.annotations.NonNls
