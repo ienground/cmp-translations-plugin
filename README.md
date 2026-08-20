@@ -1,88 +1,238 @@
+<p align="center">
+  <img src="src/main/resources/META-INF/pluginIcon.png" width="150" alt="Compose Multiplatform Translations Logo" />
+</p>
+
 # Compose Multiplatform Translations
 
-Compose Multiplatform의 `composeResources` 문자열 리소스를 IntelliJ IDEA와 Android Studio에서 관리하는 IntelliJ Platform 플러그인입니다.
+<p align="center">
+  <b>English</b> | <a href="README_ko.md">한국어</a>
+</p>
 
-## 주요 기능
+<p align="center">
+  <a href="https://plugins.jetbrains.com"><img src="https://img.shields.io/badge/JetBrains%20Marketplace-v0.2.0%20(beta)-blue?logo=jetbrains" alt="JetBrains Marketplace" /></a>
+  <a href="https://kotlinlang.org"><img src="https://img.shields.io/badge/Kotlin-2.1.0-blue?logo=kotlin" alt="Kotlin" /></a>
+  <a href="https://www.jetbrains.com/idea/"><img src="https://img.shields.io/badge/IDE-IntelliJ%20IDEA%20%7C%20Android%20Studio-green?logo=intellijidea" alt="Supported IDEs" /></a>
+  <a href="https://plugins.jetbrains.com/docs/intellij/build-number-ranges.html"><img src="https://img.shields.io/badge/Compatible%20Build-2024.2+-orange?logo=jetbrains" alt="Compatibility" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License" /></a>
+</p>
 
-- `composeResources/**/values*/strings.xml` 자동 탐색
-- source set별 번역 테이블 제공
-- key·기본 문자열·번역 문자열 검색
-- `All`, `Missing`, `Complete` 상태 필터
-- 누락·orphan·중복 key와 printf-style placeholder 불일치 검증
-- XML PSI 기반 문자열 추가·수정·삭제·key 이름 변경
-- 셀 더블 클릭을 통한 해당 XML 위치 이동
-- 리소스 파일 변경 감지 및 새로고침
+A powerful IntelliJ Platform plugin for IntelliJ IDEA and Android Studio designed to manage Compose Multiplatform `composeResources` string resources with a dedicated translation grid, real-time validation, and safe PSI-based XML editing.
 
-플러그인은 XML 리소스만 수정하며 Compose Multiplatform runtime이나 `stringResource(Res.string.*)` 사용 방식은 변경하지 않습니다.
+---
 
-자세한 사용법은 [compose-resources-editor.md](docs/compose-resources-editor.md)를 참고하세요.
+## Features & Support Matrix
 
-## 설치
+- **Kotlin-First & Compose Multiplatform Native**: Built specifically for the official `composeResources` directory hierarchy across any source set (`commonMain`, `androidMain`, `iosMain`, etc.).
+- **Centralized Translation Grid**: Edit default strings and localized translations (`values-ko`, `values-ja`, `values-es`, etc.) side-by-side in an intuitive tabular view.
+- **Real-Time Validation & Linting**: Instantly flags missing translations, orphan keys, duplicate definitions, and printf-style placeholder (`%s`, `%d`) mismatches.
+- **Safe PSI-Based Operations**: Employs IntelliJ XML PSI and `WriteCommandAction` for adding, modifying, deleting, and renaming keys with full undo/redo integration.
+- **Zero Runtime Overhead**: Acts purely as IDE tooling; modifies raw XML resource files directly without introducing runtime dependencies or changing code generation behaviors.
+
+### Support Matrix
+
+| Feature | IntelliJ IDEA | Android Studio | Completion Rate | Under the Hood |
+| :--- | :---: | :---: | :---: | :--- |
+| **String Resource Editing (`<string>`)** | ✅ Supported | ✅ Supported | 100% | IntelliJ XML PSI & `WriteCommandAction` |
+| **Multi-SourceSet Discovery** | ✅ Supported | ✅ Supported | 100% | Virtual File System (VFS) indexer |
+| **Missing & Orphan Key Validation** | ✅ Supported | ✅ Supported | 100% | Key set differential analyzer |
+| **Placeholder Mismatch Detection** | ✅ Supported | ✅ Supported | 100% | Regex printf token validator (`%s`, `%d`, etc.) |
+| **Direct XML Tag Navigation** | ✅ Supported | ✅ Supported | 100% | PSI Element target locator (double-click cell) |
+| **Status Filter (`All`, `Missing`, `Complete`)** | ✅ Supported | ✅ Supported | 100% | Dynamic table row filter model |
+| **Plural Resources (`<plurals>`)** | 🟡 Planned | 🟡 Planned | 0% | In Roadmap |
+| **String Array Resources (`<string-array>`)** | 🟡 Planned | 🟡 Planned | 0% | In Roadmap |
+| **AI Translation Provider Integration** | 🟡 Planned | 🟡 Planned | 0% | In Roadmap |
+
+---
+
+## Installation
 
 ### JetBrains Marketplace
 
-Marketplace에서 `Compose Multiplatform Translations`를 검색한 뒤 설치합니다.
+1. Open your IDE (**IntelliJ IDEA** or **Android Studio**).
+2. Navigate to **Settings / Preferences** (`⌘,` on macOS or `Ctrl+Alt+S` on Windows/Linux) > **Plugins**.
+3. Select the **Marketplace** tab and search for `Compose Multiplatform Translations`.
+4. Click **Install** and restart the IDE if prompted.
 
-### ZIP 파일
+> [!TIP]
+> During beta releases, add the beta channel repository `https://plugins.jetbrains.com/plugins/beta/list` under **Plugins > ⚙️ > Manage Plugin Repositories...**.
 
-저장소의 [Releases](https://github.com/ienground/cmp-translations-plugin/releases)에서 ZIP 파일을 내려받아 IDE의 `Settings/Preferences > Plugins > ⚙️ > Install Plugin from Disk...`로 설치합니다.
+### Manual Installation (ZIP)
 
-## 개발 및 검증
+1. Download the latest release `.zip` from [GitHub Releases](https://github.com/ienground/cmp-translations-plugin/releases).
+2. In your IDE, go to **Settings / Preferences > Plugins**.
+3. Click the gear icon (⚙️) and choose **Install Plugin from Disk...**.
+4. Select the downloaded ZIP file and restart the IDE.
 
-Java 21과 Gradle Wrapper를 사용합니다.
+### Gradle Project Setup
 
-```bash
-./gradlew check
-./gradlew buildPlugin
-./gradlew verifyPlugin
+Ensure your Compose Multiplatform project is configured with the official Compose Resources library in your `build.gradle.kts`:
+
+```kotlin
+plugins {
+    kotlin("multiplatform")
+    id("org.jetbrains.compose")
+    id("org.jetbrains.kotlin.plugin.compose")
+}
+
+kotlin {
+    sourceSets {
+        commonMain.dependencies {
+            implementation(compose.runtime)
+            implementation(compose.foundation)
+            implementation(compose.material3)
+            implementation(compose.components.resources)
+        }
+    }
+}
 ```
 
-개발용 IDE에서 플러그인을 실행하려면 다음 명령을 사용합니다.
+> [!IMPORTANT]
+> **Minimum Requirements:**
+> - **IDE**: IntelliJ IDEA 2024.2+ or Android Studio Ladybug (2024.2+) / Meerkat (2024.3+)
+> - **JDK**: Java 21 or higher (when building from source)
+> - **Compose Multiplatform**: 1.6.0 or higher with `composeResources` support
 
-```bash
-./gradlew runIde
+---
+
+## Running the Sample App
+
+To test and explore the plugin in action:
+
+1. Clone this repository:
+   ```bash
+   git clone https://github.com/ienground/cmp-translations-plugin.git
+   cd cmp-translations-plugin
+   ```
+2. Launch a sandboxed IDE instance containing the plugin:
+   ```bash
+   ./gradlew runIde
+   ```
+3. In the launched IDE instance, open any Compose Multiplatform project containing `composeResources`.
+4. Open the **Compose Translations** Tool Window from the bottom or right sidebar.
+5. Select a source set (such as `commonMain`) from the **Resource set** dropdown to view and manage strings.
+
+---
+
+## Usage Example
+
+### 1. Directory Structure
+
+The plugin automatically detects and manages string files structured according to Compose Multiplatform conventions:
+
+```text
+my-project/
+└── src/
+    └── commonMain/
+        └── composeResources/
+            ├── values/
+            │   └── strings.xml        <-- Default (fallback) locale
+            ├── values-ko/
+            │   └── strings.xml        <-- Korean locale
+            └── values-ja/
+                └── strings.xml        <-- Japanese locale
 ```
 
-생성된 배포 파일은 `build/distributions/` 아래에 있습니다.
+### 2. XML Resource Definition
 
-> [!NOTE]
-> `build.gradle.kts`는 로컬에 설치된 Android Studio를 개발용 플랫폼으로 우선 사용할 수 있습니다. Marketplace 최초 업로드는 GitHub Actions의 Build workflow가 생성한 ZIP을 사용하는 것이 안전합니다. 로컬 IDE 버전에 따라 플러그인의 `since-build`가 달라질 수 있습니다.
+`src/commonMain/composeResources/values/strings.xml`:
+```xml
+<resources>
+    <string name="app_name">My Application</string>
+    <string name="welcome_user">Welcome, %s!</string>
+    <string name="items_count">You have %d items.</string>
+</resources>
+```
 
-## Marketplace 출시
+`src/commonMain/composeResources/values-ko/strings.xml`:
+```xml
+<resources>
+    <string name="app_name">내 애플리케이션</string>
+    <string name="welcome_user">%s님, 환영합니다!</string>
+    <string name="items_count">%d개의 항목이 있습니다.</string>
+</resources>
+```
 
-GitHub Actions가 빌드·테스트·Plugin Verifier를 통과한 뒤 GitHub Release 초안을 만듭니다. 초안을 검토하고 `Publish release`를 누르면 `release.yml`이 해당 태그의 플러그인을 JetBrains Marketplace에 게시합니다.
+### 3. Using in Compose Multiplatform Code
 
-### 최초 등록
+```kotlin
+import androidx.compose.foundation.layout.Column
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import org.jetbrains.compose.resources.stringResource
+import myproject.composeapp.generated.resources.Res
+import myproject.composeapp.generated.resources.app_name
+import myproject.composeapp.generated.resources.welcome_user
+import myproject.composeapp.generated.resources.items_count
 
-최초 등록은 [JetBrains Marketplace의 Upload plugin](https://plugins.jetbrains.com/docs/marketplace/uploading-a-new-plugin.html)에서 한 번 수동으로 진행해야 합니다.
+@Composable
+fun WelcomeScreen(userName: String, count: Int) {
+    Column {
+        Text(text = stringResource(Res.string.app_name))
+        Text(text = stringResource(Res.string.welcome_user, userName))
+        Text(text = stringResource(Res.string.items_count, count))
+    }
+}
+```
 
-1. JetBrains Marketplace에서 Vendor 프로필을 만들고 Developer Agreement에 동의합니다.
-2. `build/distributions/*.zip` 파일을 업로드합니다.
-3. Apache 2.0 라이선스와 [소스 저장소](https://github.com/ienground/cmp-translations-plugin)를 등록합니다.
-4. `beta` custom release channel을 선택합니다.
-5. 플러그인 설명·태그·스크린샷·지원 링크를 입력하고 검토를 요청합니다.
+### 4. Translation Editor Operations
 
-플러그인 XML ID는 `zone.ien.cmp_translation_plugin`입니다. 첫 업로드 후 Marketplace에서 발급한 영구 토큰과 서명 정보를 GitHub 저장소의 `Settings > Secrets and variables > Actions`에 다음 이름으로 등록합니다.
+- **Add String Resource**: Click the **Add string** toolbar button to define a new key with default and localized values simultaneously.
+- **Edit Inline**: Double-click or type directly inside any cell to update the corresponding XML element.
+- **Navigate to XML**: Double-click any cell or header to jump straight to the source `<string>` tag in the respective `strings.xml`.
+- **Search & Filter**: Search across keys, default values, and translated strings, or filter rows by `All`, `Missing translations`, or `Complete`.
+- **Delete Resource**: Select a row and click **Delete selected** to remove the key across all locale files at once.
 
-| Secret | 용도 |
-| --- | --- |
-| `PUBLISH_TOKEN` | Marketplace 업로드 인증 |
-| `PRIVATE_KEY` | 플러그인 서명 개인 키 |
-| `PRIVATE_KEY_PASSWORD` | 개인 키 암호 |
-| `CERTIFICATE_CHAIN` | 서명 인증서 체인 |
+---
 
-### 새 버전 출시
+## Migration Guide
 
-1. `gradle.properties`의 `version`을 올리고 `CHANGELOG.md`의 `[Unreleased]`에 변경 내용을 작성합니다.
-2. 변경 사항을 `main`에 반영합니다.
-3. Build workflow의 테스트·검증 결과를 확인합니다.
-4. 생성된 GitHub Release 초안을 `Pre-release`로 게시합니다.
-5. Release workflow가 서명 후 Marketplace에 업로드하는지 확인합니다.
+### Target Audience
 
-Marketplace 서명 및 업로드 설정은 [Publishing a Plugin](https://plugins.jetbrains.com/docs/intellij/publishing-plugin.html)과 [Plugin Signing](https://plugins.jetbrains.com/docs/intellij/plugin-signing.html)을 따릅니다.
+- Teams migrating from Android-only localization (`res/values/strings.xml`) to Compose Multiplatform (`composeResources/**/strings.xml`).
+- Multiplatform development teams looking for an Android Studio Translations Editor equivalent for shared Compose resources.
 
-현재 배포 채널은 `beta`입니다. Beta 플러그인을 설치하려면 IDE에 `https://plugins.jetbrains.com/plugins/beta/list`를 custom plugin repository로 추가해야 합니다.
+### Comparison & Namespace Mapping
 
-## 라이선스
+| Aspect | Android Native Localization | Compose Multiplatform `composeResources` |
+| :--- | :--- | :--- |
+| **Directory Location** | `src/main/res/values*/strings.xml` | `src/<sourceSet>/composeResources/values*/strings.xml` |
+| **Access Syntax** | `R.string.key_name` / `stringResource(R.string.key_name)` | `Res.string.key_name` / `stringResource(Res.string.key_name)` |
+| **Target Platforms** | Android only | Android, iOS, Desktop (JVM), Web (Wasm/JS) |
+| **IDE Translation Editor** | Android Studio Translations Editor (Android only) | **Compose Multiplatform Translations** (Cross-platform) |
+| **Code Generation** | Android Gradle Plugin (AAPT2) | Compose Multiplatform Gradle Plugin (`Res`) |
+| **Resource Root** | Resource directory configured in `android.sourceSets` | `composeResources` inside Kotlin source sets |
 
-이 프로젝트는 [Apache License 2.0](LICENSE)으로 배포합니다.
+### Key Migration Notes
+
+- **Non-Destructive Integration**: This plugin works directly on standard XML files without modifying Gradle build logic or generated Kotlin code (`Res.string.*`).
+- **Formatter & Comment Preservation**: PSI-based writes preserve surrounding formatting, attributes, and comments wherever possible.
+- **File System Synchronization**: Automatically updates when files are modified externally, switched via Git branches, or generated by scripts.
+
+---
+
+## Platform Limitations & Constraints
+
+- **Supported Tags**: Currently supports single-value `<string name="...">...</string>` tags. Multi-value `<plurals>` and `<string-array>` tags will be supported in upcoming releases.
+- **Directory Conventions**: Files must reside under standard `composeResources/**/values*/strings.xml` directories to be indexed automatically.
+- **Platform Qualifiers**: Qualifier naming follows Android / Compose Multiplatform conventions (e.g. `values`, `values-ko`, `values-en-rUS`, `values-b+sr+Latn`).
+
+---
+
+## License
+
+```yaml
+Copyright (c) 2026. Compose Multiplatform Translations project and open source contributors.
+Copyright (c) 2026. IENGROUND of IENLAB.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+```
