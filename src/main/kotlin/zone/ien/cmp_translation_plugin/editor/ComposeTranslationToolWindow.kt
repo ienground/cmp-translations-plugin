@@ -511,19 +511,19 @@ internal class AddStringDialog(
 
     override fun createCenterPanel(): JComponent = panel {
         row(MyBundle.message("translation.dialog.add.key")) {
-            cell(keyField).align(Align.FILL)
+            cell(keyField).align(AlignX.FILL).resizableColumn()
             cell(untranslatableCheck)
         }
         row(MyBundle.message("translation.dialog.add.default")) {
-            cell(defaultField).align(Align.FILL)
+            cell(defaultField).align(AlignX.FILL)
         }
         qualifiers.forEach { qualifier ->
             row(MyBundle.message("translation.dialog.add.locale", qualifier.displayName)) {
-                cell(localizedFields.getValue(qualifier)).align(Align.FILL)
+                cell(localizedFields.getValue(qualifier)).align(AlignX.FILL)
             }
         }
     }.apply {
-        preferredSize = JBUI.size(420, 100 + qualifiers.size * 34)
+        preferredSize = JBUI.size(500, 100 + qualifiers.size * 34)
     }
 
     override fun doValidate(): ValidationInfo? = if (keyField.text.trim().isEmpty()) {
