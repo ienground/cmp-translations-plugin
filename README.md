@@ -9,10 +9,10 @@
 </p>
 
 <p align="center">
-  <a href="https://plugins.jetbrains.com"><img src="https://img.shields.io/badge/JetBrains%20Marketplace-v0.4.0%20(beta)-blue?logo=jetbrains" alt="JetBrains Marketplace" /></a>
-  <a href="https://kotlinlang.org"><img src="https://img.shields.io/badge/Kotlin-2.1.0-blue?logo=kotlin" alt="Kotlin" /></a>
+  <a href="https://plugins.jetbrains.com"><img src="https://img.shields.io/badge/JetBrains%20Marketplace-v1.0.0--beta-blue?logo=jetbrains" alt="JetBrains Marketplace" /></a>
+  <a href="https://kotlinlang.org"><img src="https://img.shields.io/badge/Kotlin-2.4.20-blue?logo=kotlin" alt="Kotlin" /></a>
   <a href="https://www.jetbrains.com/idea/"><img src="https://img.shields.io/badge/IDE-IntelliJ%20IDEA%20%7C%20Android%20Studio-green?logo=intellijidea" alt="Supported IDEs" /></a>
-  <a href="https://plugins.jetbrains.com/docs/intellij/build-number-ranges.html"><img src="https://img.shields.io/badge/Compatible%20Build-2024.2+-orange?logo=jetbrains" alt="Compatibility" /></a>
+  <a href="https://plugins.jetbrains.com/docs/intellij/build-number-ranges.html"><img src="https://img.shields.io/badge/Compatible%20Build-2025.2+-orange?logo=jetbrains" alt="Compatibility" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License" /></a>
 </p>
 
@@ -58,7 +58,7 @@ A powerful IntelliJ Platform plugin for IntelliJ IDEA and Android Studio designe
 
 ### Manual Installation (ZIP)
 
-1. Download the latest release `.zip` from [GitHub Releases](https://github.com/ienground/cmp-translations-plugin/releases).
+1. Download the plugin distribution ZIP (for example, `Compose Multiplatform Translations-1.0.0-beta.zip`) from [GitHub Releases](https://github.com/ienground/cmp-translations-plugin/releases). Do not select GitHub's `Source code (zip)` archive.
 2. In your IDE, go to **Settings / Preferences > Plugins**.
 3. Click the gear icon (⚙️) and choose **Install Plugin from Disk...**.
 4. Select the downloaded ZIP file and restart the IDE.
@@ -88,9 +88,13 @@ kotlin {
 
 > [!IMPORTANT]
 > **Minimum Requirements:**
-> - **IDE**: IntelliJ IDEA 2024.2+ or Android Studio Ladybug (2024.2+) / Meerkat (2024.3+)
+> - **IDE**: IntelliJ IDEA 2025.2+ or Android Studio 2025.2+
+> - **Kotlin**: 2.4.20 (when building from source)
 > - **JDK**: Java 21 or higher (when building from source)
 > - **Compose Multiplatform**: 1.6.0 or higher with `composeResources` support
+
+> [!NOTE]
+> IntelliJ IDEA 2026.3 EAP is not part of the stable verification matrix. Verify the exact EAP build and plugin ZIP before distribution.
 
 ---
 
