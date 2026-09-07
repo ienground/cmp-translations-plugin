@@ -1,10 +1,6 @@
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 
 val localAndroidStudioPath = providers.gradleProperty("androidStudioPath").orNull
-    ?: listOf(
-        "${System.getProperty("user.home")}/Applications/Android Studio.app",
-        "/Applications/Android Studio.app",
-    ).firstOrNull { path -> file(path).isDirectory }
 
 plugins {
     id("org.jetbrains.kotlin.jvm")

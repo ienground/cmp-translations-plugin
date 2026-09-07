@@ -9,10 +9,10 @@
 </p>
 
 <p align="center">
-  <a href="https://plugins.jetbrains.com"><img src="https://img.shields.io/badge/JetBrains%20Marketplace-v0.4.0%20(beta)-blue?logo=jetbrains" alt="JetBrains Marketplace" /></a>
-  <a href="https://kotlinlang.org"><img src="https://img.shields.io/badge/Kotlin-2.1.0-blue?logo=kotlin" alt="Kotlin" /></a>
+  <a href="https://plugins.jetbrains.com"><img src="https://img.shields.io/badge/JetBrains%20Marketplace-v1.0.0--beta-blue?logo=jetbrains" alt="JetBrains Marketplace" /></a>
+  <a href="https://kotlinlang.org"><img src="https://img.shields.io/badge/Kotlin-2.4.20-blue?logo=kotlin" alt="Kotlin" /></a>
   <a href="https://www.jetbrains.com/idea/"><img src="https://img.shields.io/badge/IDE-IntelliJ%20IDEA%20%7C%20Android%20Studio-green?logo=intellijidea" alt="지원 IDE" /></a>
-  <a href="https://plugins.jetbrains.com/docs/intellij/build-number-ranges.html"><img src="https://img.shields.io/badge/Compatible%20Build-2024.2+-orange?logo=jetbrains" alt="호환 빌드" /></a>
+  <a href="https://plugins.jetbrains.com/docs/intellij/build-number-ranges.html"><img src="https://img.shields.io/badge/Compatible%20Build-2025.2+-orange?logo=jetbrains" alt="호환 빌드" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="라이선스" /></a>
 </p>
 
@@ -58,7 +58,7 @@ IntelliJ IDEA 및 Android Studio에서 Compose Multiplatform의 `composeResource
 
 ### ZIP 파일 수동 설치
 
-1. [GitHub Releases](https://github.com/ienground/cmp-translations-plugin/releases)에서 최신 릴리스 `.zip` 파일을 다운로드합니다.
+1. [GitHub Releases](https://github.com/ienground/cmp-translations-plugin/releases)에서 플러그인 배포 ZIP(예: `Compose Multiplatform Translations-1.0.0-beta.zip`)을 다운로드합니다. GitHub의 `Source code (zip)` 아카이브는 선택하지 마세요.
 2. IDE의 **Settings / Preferences > Plugins**로 이동합니다.
 3. 톱니바퀴 아이콘(⚙️)을 클릭하고 **Install Plugin from Disk...**를 선택합니다.
 4. 다운로드한 ZIP 파일을 선택하고 IDE를 재시작합니다.
@@ -88,9 +88,13 @@ kotlin {
 
 > [!IMPORTANT]
 > **최소 요구사항:**
-> - **IDE**: IntelliJ IDEA 2024.2+ 또는 Android Studio Ladybug (2024.2+) / Meerkat (2024.3+)
+> - **IDE**: IntelliJ IDEA 2025.2+ 또는 Android Studio 2025.2+
+> - **Kotlin**: 2.4.20 (소스 빌드 시)
 > - **JDK**: Java 21 이상 (소스 빌드 및 개발 시)
 > - **Compose Multiplatform**: 1.6.0 이상 (`composeResources` 지원 버전)
+
+> [!NOTE]
+> IntelliJ IDEA 2026.3 EAP는 안정 버전 검증 매트릭스에 포함되지 않습니다. 배포 전 해당 EAP 빌드와 플러그인 ZIP을 별도로 검증하세요.
 
 ---
 

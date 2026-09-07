@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Changed
+
+- Prepare the `1.0.0-beta` plugin release metadata
+- Upgrade the Kotlin Gradle plugin to `2.4.20`
+
 ### Added
 
 - Automatically discover `composeResources` string resources and provide translation tables for each source set
