@@ -1,6 +1,10 @@
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
 
 val localAndroidStudioPath = providers.gradleProperty("androidStudioPath").orNull
+val releaseChannel = project.version.toString()
+    .substringAfter('-', missingDelimiterValue = "")
+    .substringBefore('.')
+    .let { suffix -> if (suffix == "beta") "beta" else "default" }
 
 plugins {
     id("org.jetbrains.kotlin.jvm")
@@ -30,6 +34,6 @@ dependencies {
 
 intellijPlatform {
     publishing {
-        channels = listOf("beta")
+        channels = listOf(releaseChannel)
     }
 }
