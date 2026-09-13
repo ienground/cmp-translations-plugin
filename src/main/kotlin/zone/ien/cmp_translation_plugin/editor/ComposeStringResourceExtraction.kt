@@ -10,6 +10,12 @@ internal object ComposeStringResourceExtraction {
     private val generatedResImport = Regex(
         "(?m)^\\s*import\\s+[A-Za-z_][A-Za-z0-9_.]*\\.Res(?:\\s+as\\s+([A-Za-z_][A-Za-z0-9_]*))?\\s*$",
     )
+    private val generatedResWildcardImport = Regex(
+        "(?m)^\\s*import\\s+[A-Za-z_][A-Za-z0-9_.]*\\.generated\\.resources\\.\\*\\s*$",
+    )
+    private val stringResourceImport = Regex(
+        "(?m)^\\s*import\\s+org\\.jetbrains\\.compose\\.resources\\.stringResource(?:\\s+as\\s+([A-Za-z_][A-Za-z0-9_]*))?\\s*$",
+    )
     private val packageDeclaration = Regex("(?m)^\\s*package\\s+([A-Za-z_][A-Za-z0-9_.]*)\\s*$")
 
     fun suggestResourceKey(value: String): String {
@@ -76,13 +82,22 @@ internal object ComposeStringResourceExtraction {
     }
 
     fun replacementExpression(resourceKey: String, resReference: String): String =
-        "stringResource($resReference.string.$resourceKey)"
+        replacementExpression(resourceKey, resReference, "stringResource")
 
-    fun resReference(sourceText: String): String =
+    fun replacementExpression(
+        resourceKey: String,
+        resReference: String,
+        stringResourceFunction: String,
+    ): String = "$stringResourceFunction($resReference.string.$resourceKey)"
+
+    fun stringResourceReference(sourceText: String): String =
+        stringResourceImport.find(sourceText)?.groupValues?.getOrNull(1)?.takeIf(String::isNotBlank)
+            ?: "stringResource"
+
+    fun resReference(sourceText: String): String? =
         generatedResImport.find(sourceText)?.groupValues?.getOrNull(1)?.takeIf(String::isNotBlank)
             ?: generatedResImport.find(sourceText)?.value?.let { "Res" }
-            ?: packageDeclaration.find(sourceText)?.groupValues?.get(1)?.let { "$it.generated.resources.Res" }
-            ?: "Res"
+            ?: generatedResWildcardImport.find(sourceText)?.let { "Res" }
 
     fun missingImport(sourceText: String, importName: String): String? {
         val importPattern = Regex("(?m)^\\s*import\\s+${Regex.escape(importName)}(?:\\s+as\\s+[A-Za-z_][A-Za-z0-9_]*)?\\s*$")

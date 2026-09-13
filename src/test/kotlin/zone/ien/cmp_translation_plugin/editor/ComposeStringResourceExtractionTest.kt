@@ -56,6 +56,24 @@ class ComposeStringResourceExtractionTest {
             "stringResource(Resources.string.hello_world)",
             ComposeStringResourceExtraction.replacementExpression("hello_world", "Resources"),
         )
+        assertEquals(
+            "sr(Res.string.hello_world)",
+            ComposeStringResourceExtraction.replacementExpression("hello_world", "Res", "sr"),
+        )
+    }
+
+    @Test
+    fun usesExistingStringResourceAlias() {
+        assertEquals(
+            "sr",
+            ComposeStringResourceExtraction.stringResourceReference(
+                "import org.jetbrains.compose.resources.stringResource as sr\n",
+            ),
+        )
+        assertEquals(
+            "stringResource",
+            ComposeStringResourceExtraction.stringResourceReference("package sample.ui\n"),
+        )
     }
 
     @Test
@@ -69,6 +87,11 @@ class ComposeStringResourceExtractionTest {
         """.trimIndent()
 
         assertEquals("Res", ComposeStringResourceExtraction.resReference(source))
+        assertNull(ComposeStringResourceExtraction.resReference("package sample.ui\n"))
+        assertEquals(
+            "Res",
+            ComposeStringResourceExtraction.resReference("import sample.generated.resources.*\n"),
+        )
         assertEquals(
             "import org.jetbrains.compose.resources.stringResource\n",
             ComposeStringResourceExtraction.missingImport(source, "org.jetbrains.compose.resources.stringResource"),
