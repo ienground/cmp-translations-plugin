@@ -16,10 +16,10 @@
 
     <extensions defaultExtensionNs="com.intellij">
         <iconMapper mappingFile="ComposeMultiplatformTranslationsIconMappings.json"/>
-        <intentionAction
-                implementationClass="zone.ien.cmp_translation_plugin.editor.ComposeStringResourceIntentionAction"
-                language="kotlin"
-        />
+        <intentionAction>
+            <language>kotlin</language>
+            <className>zone.ien.cmp_translation_plugin.editor.ComposeStringResourceIntentionAction</className>
+        </intentionAction>
         <gotoDeclarationHandler implementation="zone.ien.cmp_translation_plugin.editor.ComposeTranslationGotoDeclarationHandler" order="first"/>
         <toolWindow
                 doNotActivateOnStart="false"

@@ -7,6 +7,7 @@ import com.intellij.psi.xml.XmlFile
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
+import zone.ien.cmp_translation_plugin.MyBundle
 import zone.ien.cmp_translation_plugin.resource.ComposeResourceCatalog
 import zone.ien.cmp_translation_plugin.resource.ComposeResourceQualifier
 
@@ -20,6 +21,20 @@ class ComposeStringResourceIntentionTest : com.intellij.testFramework.fixtures.B
         myFixture.editor.caretModel.moveToOffset(file.text.indexOf('"'))
 
         assertTrue(ComposeStringResourceIntentionAction().isAvailable(project, myFixture.editor, file))
+    }
+
+    fun testRegisteredIntentionIsAvailableInEditor() {
+        val file = myFixture.configureByText(
+            "Usage.kt",
+            "import androidx.compose.runtime.Composable\n\n@Composable\nfun screen() = \"Hello world\"",
+        )
+        myFixture.editor.caretModel.moveToOffset(file.text.indexOf('"'))
+
+        assertTrue(
+            myFixture.availableIntentions.any { intention ->
+                intention.text == MyBundle.message("translation.extract.action.name")
+            },
+        )
     }
 
     fun testIsNotAvailableOutsideComposableContext() {
