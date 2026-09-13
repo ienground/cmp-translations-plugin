@@ -4,7 +4,7 @@
 
 ### Changed
 
-- Prepare the `1.0.0-beta2` plugin release metadata
+- Prepare the `1.0.0` plugin release metadata
 - Upgrade the Kotlin Gradle plugin to `2.4.20`
 
 ### Added
