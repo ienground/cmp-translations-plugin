@@ -58,7 +58,7 @@ A powerful IntelliJ Platform plugin for IntelliJ IDEA and Android Studio designe
 
 ### Manual Installation (ZIP)
 
-1. Download the plugin distribution ZIP (for example, `Compose Multiplatform Translations-1.0.0-beta.zip`) from [GitHub Releases](https://github.com/ienground/cmp-translations-plugin/releases). Do not select GitHub's `Source code (zip)` archive.
+1. Download the plugin distribution ZIP (for example, `Compose Multiplatform Translations-1.0.0-beta2.zip`) from [GitHub Releases](https://github.com/ienground/cmp-translations-plugin/releases). Do not select GitHub's `Source code (zip)` archive.
 2. In your IDE, go to **Settings / Preferences > Plugins**.
 3. Click the gear icon (⚙️) and choose **Install Plugin from Disk...**.
 4. Select the downloaded ZIP file and restart the IDE.

@@ -24,6 +24,7 @@ import javax.swing.JTextField
 import javax.swing.SwingUtilities
 import java.util.concurrent.atomic.AtomicReference
 import zone.ien.cmp_translation_plugin.MyBundle
+import zone.ien.cmp_translation_plugin.resource.ComposeResourceQualifier
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -353,6 +354,20 @@ class ComposeTranslationToolWindowTest : BasePlatformTestCase() {
         ) as JTextField
 
         assertEquals("", editorComponent.text)
+    }
+
+    fun testAddStringDialogPrefillsExtractionKeyAndDefaultValue() {
+        val dialog = AddStringDialog(
+            project = project,
+            qualifiers = listOf(ComposeResourceQualifier("ko")),
+            initialKey = "hello_world",
+            initialDefaultValue = "Hello world",
+        )
+
+        val draft = dialog.draft()
+        assertEquals("hello_world", draft.key)
+        assertEquals("Hello world", draft.defaultValue)
+        assertEquals("", draft.localizedValues[ComposeResourceQualifier("ko")])
     }
 
     fun testToolbarWrapsWhenWindowBecomesNarrow() {

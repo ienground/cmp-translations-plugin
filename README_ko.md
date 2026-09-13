@@ -58,7 +58,7 @@ IntelliJ IDEA 및 Android Studio에서 Compose Multiplatform의 `composeResource
 
 ### ZIP 파일 수동 설치
 
-1. [GitHub Releases](https://github.com/ienground/cmp-translations-plugin/releases)에서 플러그인 배포 ZIP(예: `Compose Multiplatform Translations-1.0.0-beta.zip`)을 다운로드합니다. GitHub의 `Source code (zip)` 아카이브는 선택하지 마세요.
+1. [GitHub Releases](https://github.com/ienground/cmp-translations-plugin/releases)에서 플러그인 배포 ZIP(예: `Compose Multiplatform Translations-1.0.0-beta2.zip`)을 다운로드합니다. GitHub의 `Source code (zip)` 아카이브는 선택하지 마세요.
 2. IDE의 **Settings / Preferences > Plugins**로 이동합니다.
 3. 톱니바퀴 아이콘(⚙️)을 클릭하고 **Install Plugin from Disk...**를 선택합니다.
 4. 다운로드한 ZIP 파일을 선택하고 IDE를 재시작합니다.

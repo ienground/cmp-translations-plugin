@@ -463,10 +463,12 @@ internal class AddStringDialog(
     project: Project,
     private val qualifiers: List<ComposeResourceQualifier>,
     private val initialRow: TranslationRow? = null,
+    private val initialKey: String = "",
+    private val initialDefaultValue: String = "",
 ) : DialogWrapper(project) {
 
-    private val keyField = JBTextField(initialRow?.key ?: "")
-    private val defaultField = JBTextField(initialRow?.defaultValue ?: "")
+    private val keyField = JBTextField(initialRow?.key ?: initialKey)
+    private val defaultField = JBTextField(initialRow?.defaultValue ?: initialDefaultValue)
     private val localizedFields = qualifiers.associateWith { qualifier -> 
         JBTextField(initialRow?.localizedValues?.get(qualifier) ?: "") 
     }

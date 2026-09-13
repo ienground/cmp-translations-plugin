@@ -58,6 +58,24 @@ class ComposeTranslationNavigationTest : BasePlatformTestCase() {
         assertEquals("commonMain", selected?.sourceSetName)
     }
 
+    fun testSelectsResourceSetMatchingNewUsageSourceFile() {
+        myFixture.tempDirFixture.createFile(
+            "src/commonMain/composeResources/values/strings.xml",
+            "<resources><string name=\"login\">Common</string></resources>",
+        )
+        val usageFile = myFixture.tempDirFixture.createFile(
+            "src/commonMain/kotlin/Usage.kt",
+            "fun screen() = \"Hello\"",
+        )
+
+        val selected = ComposeTranslationNavigation.findResourceSetForSource(
+            resourceSets = ComposeResourceCatalog(project).load(),
+            sourceFile = usageFile,
+        )
+
+        assertEquals("commonMain", selected?.sourceSetName)
+    }
+
     fun testGotoHandlerReturnsNavigableTranslationTarget() {
         myFixture.tempDirFixture.createFile(
             "src/commonMain/composeResources/values/strings.xml",
