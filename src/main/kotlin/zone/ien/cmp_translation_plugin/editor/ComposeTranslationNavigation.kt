@@ -61,6 +61,19 @@ internal object ComposeTranslationNavigation {
             ?: candidates.singleOrNull()
     }
 
+    fun findResourceSetForSource(
+        resourceSets: List<ComposeResourceSet>,
+        sourceFile: VirtualFile?,
+    ): ComposeResourceSet? {
+        val file = sourceFile ?: return null
+        return resourceSets
+            .filter { resourceSet ->
+                val sourceSetRoot = resourceSet.resourceRoot.parent ?: return@filter false
+                file.path == sourceSetRoot.path || file.path.startsWith("${sourceSetRoot.path}/")
+            }
+            .maxByOrNull { it.resourceRoot.path.length }
+    }
+
     fun rowFor(resourceSet: ComposeResourceSet, key: String): TranslationRow? {
         val defaultEntry = resourceSet.defaultDocument?.entries?.firstOrNull { it.key == key }
         val localizedValues = resourceSet.localizedDocuments.associate { document ->
