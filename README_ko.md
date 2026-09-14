@@ -58,7 +58,7 @@ IntelliJ IDEA 및 Android Studio에서 Compose Multiplatform의 `composeResource
 
 ### ZIP 파일 수동 설치
 
-1. [GitHub Releases](https://github.com/ienground/cmp-translations-plugin/releases)에서 플러그인 배포 ZIP(예: `Compose Multiplatform Translations-1.0.0.zip`)을 다운로드합니다. GitHub의 `Source code (zip)` 아카이브는 선택하지 마세요.
+1. [GitHub Releases](https://github.com/ienground/cmp-translations-plugin/releases)에서 플러그인 배포 ZIP(예: `Compose Multiplatform Translations-1.0.1.zip`)을 다운로드합니다. GitHub의 `Source code (zip)` 아카이브는 선택하지 마세요.
 2. IDE의 **Settings / Preferences > Plugins**로 이동합니다.
 3. 톱니바퀴 아이콘(⚙️)을 클릭하고 **Install Plugin from Disk...**를 선택합니다.
 4. 다운로드한 ZIP 파일을 선택하고 IDE를 재시작합니다.
@@ -118,6 +118,20 @@ kotlin {
 ---
 
 ## 사용 예제
+
+다음 이미지는 번역 그리드에서 로케일을 확인하고, 다이얼로그에서 문자열 리소스를 편집하며, 코드의 컨텍스트 메뉴에서 하드코딩된 문자열을 추출하는 흐름을 보여줍니다.
+
+<p align="center">
+  <img src="docs/images/translation-grid.png" alt="기본 언어와 한국어·일본어 번역을 보여주는 Compose Translations 번역 그리드" width="900" />
+</p>
+
+<p align="center">
+  <img src="docs/images/translation-dialog.png" alt="기본값과 한국어 번역을 편집하는 Compose 문자열 리소스 다이얼로그" width="900" />
+</p>
+
+<p align="center">
+  <img src="docs/images/translation_extract.png" alt="Extract to Compose string resource가 표시된 Kotlin 컨텍스트 메뉴" width="900" />
+</p>
 
 ### 1. 디렉터리 구조
 
