@@ -47,44 +47,44 @@ class ComposeStringResourceIntentionTest : com.intellij.testFramework.fixtures.B
         assertFalse(ComposeStringResourceIntentionAction().isAvailable(project, myFixture.editor, file))
     }
 
-    fun testIsNotAvailableInComposableFunctionDefaultParameter() {
+    fun testIsAvailableInComposableFunctionDefaultParameter() {
         val file = myFixture.configureByText(
             "Usage.kt",
             "import androidx.compose.runtime.Composable\n\n@Composable\nfun screen(title: String = \"Hello world\") = title",
         )
         myFixture.editor.caretModel.moveToOffset(file.text.indexOf('"'))
 
-        assertFalse(ComposeStringResourceIntentionAction().isAvailable(project, myFixture.editor, file))
+        assertTrue(ComposeStringResourceIntentionAction().isAvailable(project, myFixture.editor, file))
     }
 
-    fun testIsNotAvailableInNonComposableLambdaInsideComposableFunction() {
+    fun testIsAvailableInNonComposableLambdaInsideComposableFunction() {
         val file = myFixture.configureByText(
             "Usage.kt",
             "import androidx.compose.runtime.Composable\n\n@Composable\nfun screen() {\n    val value = { \"Hello world\" }\n}",
         )
         myFixture.editor.caretModel.moveToOffset(file.text.indexOf('"'))
 
-        assertFalse(ComposeStringResourceIntentionAction().isAvailable(project, myFixture.editor, file))
+        assertTrue(ComposeStringResourceIntentionAction().isAvailable(project, myFixture.editor, file))
     }
 
-    fun testIsNotAvailableInLambdaPassedToNonComposableFunction() {
+    fun testIsAvailableInLambdaPassedToNonComposableFunction() {
         val file = myFixture.configureByText(
             "Usage.kt",
             "import androidx.compose.runtime.Composable\n\nfun host(content: () -> String) = content()\n\n@Composable\nfun screen() = host { \"Hello world\" }",
         )
         myFixture.editor.caretModel.moveToOffset(file.text.indexOf('"'))
 
-        assertFalse(ComposeStringResourceIntentionAction().isAvailable(project, myFixture.editor, file))
+        assertTrue(ComposeStringResourceIntentionAction().isAvailable(project, myFixture.editor, file))
     }
 
-    fun testIsNotAvailableInUnresolvedLowercaseLambdaCall() {
+    fun testIsAvailableInUnresolvedLowercaseLambdaCall() {
         val file = myFixture.configureByText(
             "Usage.kt",
             "import androidx.compose.runtime.Composable\n\n@Composable\nfun screen() = remember { \"Hello world\" }",
         )
         myFixture.editor.caretModel.moveToOffset(file.text.indexOf('"'))
 
-        assertFalse(ComposeStringResourceIntentionAction().isAvailable(project, myFixture.editor, file))
+        assertTrue(ComposeStringResourceIntentionAction().isAvailable(project, myFixture.editor, file))
     }
 
     fun testIsAvailableInKnownComposableLambdaCall() {
@@ -97,24 +97,24 @@ class ComposeStringResourceIntentionTest : com.intellij.testFramework.fixtures.B
         assertTrue(ComposeStringResourceIntentionAction().isAvailable(project, myFixture.editor, file))
     }
 
-    fun testIsNotAvailableInKnownNonComposableLambdaCall() {
+    fun testIsAvailableInsideAnyLambdaInComposableFunction() {
         val file = myFixture.configureByText(
             "Usage.kt",
             "import androidx.compose.runtime.Composable\n\n@Composable\nfun screen() = LaunchedEffect(Unit) { \"Hello world\" }",
         )
         myFixture.editor.caretModel.moveToOffset(file.text.indexOf('"'))
 
-        assertFalse(ComposeStringResourceIntentionAction().isAvailable(project, myFixture.editor, file))
+        assertTrue(ComposeStringResourceIntentionAction().isAvailable(project, myFixture.editor, file))
     }
 
-    fun testIsNotAvailableInNonComposableNamedLambdaArgument() {
+    fun testIsAvailableInNonComposableNamedLambdaArgument() {
         val file = myFixture.configureByText(
             "Usage.kt",
             "import androidx.compose.runtime.Composable\n\n@Composable\nfun screen() = Button(onClick = { \"Hello world\" }) {}",
         )
         myFixture.editor.caretModel.moveToOffset(file.text.indexOf('"'))
 
-        assertFalse(ComposeStringResourceIntentionAction().isAvailable(project, myFixture.editor, file))
+        assertTrue(ComposeStringResourceIntentionAction().isAvailable(project, myFixture.editor, file))
     }
 
     fun testIsAvailableInComposableLambdaPassedToComposableFunction() {

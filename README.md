@@ -9,12 +9,16 @@
 </p>
 
 <p align="center">
-  <a href="https://plugins.jetbrains.com"><img src="https://img.shields.io/badge/JetBrains%20Marketplace-v1.0.0--beta-blue?logo=jetbrains" alt="JetBrains Marketplace" /></a>
+  <a href="https://plugins.jetbrains.com/plugin/33682-compose-multiplatform-translations"><img src="https://img.shields.io/jetbrains/plugin/v/33682?label=JetBrains%20Marketplace&logo=jetbrains" alt="JetBrains Marketplace version" /></a>
+  <a href="https://plugins.jetbrains.com/plugin/33682-compose-multiplatform-translations"><img src="https://img.shields.io/jetbrains/plugin/d/33682?label=downloads&logo=jetbrains" alt="JetBrains Marketplace downloads" /></a>
+  <a href="https://plugins.jetbrains.com/plugin/33682-compose-multiplatform-translations"><img src="https://img.shields.io/jetbrains/plugin/r/rating/33682?label=rating&logo=jetbrains" alt="JetBrains Marketplace rating" /></a>
   <a href="https://kotlinlang.org"><img src="https://img.shields.io/badge/Kotlin-2.4.20-blue?logo=kotlin" alt="Kotlin" /></a>
   <a href="https://www.jetbrains.com/idea/"><img src="https://img.shields.io/badge/IDE-IntelliJ%20IDEA%20%7C%20Android%20Studio-green?logo=intellijidea" alt="Supported IDEs" /></a>
   <a href="https://plugins.jetbrains.com/docs/intellij/build-number-ranges.html"><img src="https://img.shields.io/badge/Compatible%20Build-2025.2+-orange?logo=jetbrains" alt="Compatibility" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache%202.0-blue.svg" alt="License" /></a>
 </p>
+
+The Marketplace version, download count, and rating badges update dynamically from [JetBrains Marketplace plugin 33682](https://plugins.jetbrains.com/plugin/33682-compose-multiplatform-translations).
 
 A powerful IntelliJ Platform plugin for IntelliJ IDEA and Android Studio designed to manage Compose Multiplatform `composeResources` string resources with a dedicated translation grid, real-time validation, and safe PSI-based XML editing.
 
@@ -58,7 +62,7 @@ A powerful IntelliJ Platform plugin for IntelliJ IDEA and Android Studio designe
 
 ### Manual Installation (ZIP)
 
-1. Download the plugin distribution ZIP (for example, `Compose Multiplatform Translations-1.0.0.zip`) from [GitHub Releases](https://github.com/ienground/cmp-translations-plugin/releases). Do not select GitHub's `Source code (zip)` archive.
+1. Download the plugin distribution ZIP (for example, `Compose Multiplatform Translations-1.0.1.zip`) from [GitHub Releases](https://github.com/ienground/cmp-translations-plugin/releases). Do not select GitHub's `Source code (zip)` archive.
 2. In your IDE, go to **Settings / Preferences > Plugins**.
 3. Click the gear icon (⚙️) and choose **Install Plugin from Disk...**.
 4. Select the downloaded ZIP file and restart the IDE.
@@ -118,6 +122,20 @@ To test and explore the plugin in action:
 ---
 
 ## Usage Example
+
+The following previews show the main workflow: review every locale in one grid, edit a resource in a dialog, and extract a hard-coded string from the context menu.
+
+<p align="center">
+  <img src="docs/images/translation-grid.png" alt="Compose Translations tool window showing a translation grid with default, Korean, and Japanese columns" width="900" />
+</p>
+
+<p align="center">
+  <img src="docs/images/translation-dialog.png" alt="Compose string resource edit dialog showing a default value and Korean translation" width="900" />
+</p>
+
+<p align="center">
+  <img src="docs/images/translation_extract.png" alt="Kotlin context menu showing Extract to Compose string resource" width="900" />
+</p>
 
 ### 1. Directory Structure
 

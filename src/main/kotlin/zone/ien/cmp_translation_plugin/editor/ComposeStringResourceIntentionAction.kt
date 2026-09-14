@@ -10,14 +10,7 @@ import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiFile
-import org.jetbrains.kotlin.psi.KtAnnotationEntry
 import org.jetbrains.kotlin.psi.KtAnnotated
-import org.jetbrains.kotlin.psi.KtCallExpression
-import org.jetbrains.kotlin.psi.KtCallableDeclaration
-import org.jetbrains.kotlin.psi.KtLambdaExpression
-import org.jetbrains.kotlin.psi.KtParameter
-import org.jetbrains.kotlin.psi.KtProperty
-import org.jetbrains.kotlin.psi.KtValueArgument
 import zone.ien.cmp_translation_plugin.MyBundle
 import zone.ien.cmp_translation_plugin.resource.ComposeResourceCatalog
 import zone.ien.cmp_translation_plugin.resource.ComposeResourceQualifier
@@ -204,51 +197,10 @@ internal class ComposeStringResourceIntentionAction(
 
     private fun isComposableContext(file: PsiFile, literalRange: TextRange): Boolean {
         val element = file.findElementAt(literalRange.startOffset) ?: return false
-        val ancestors = generateSequence(element) { it.parent }
+        return generateSequence(element) { it.parent }
             .takeWhile { it !is PsiFile }
-            .toList()
-        if (ancestors.any { it is KtParameter || it is KtAnnotationEntry }) return false
-        ancestors.filterIsInstance<KtLambdaExpression>().firstOrNull()?.let { lambda ->
-            val property = ancestors.filterIsInstance<KtProperty>().firstOrNull()
-            val isComposableProperty =
-                property?.initializer == lambda && property.typeReference?.hasComposableAnnotation() == true
-            if (property?.initializer == lambda && !isComposableProperty) {
-                return false
-            }
-            if (!isComposableProperty && !isComposableLambda(lambda)) {
-                return false
-            }
-        }
-
-        return ancestors
             .filterIsInstance<KtAnnotated>()
-            .any { annotated ->
-                annotated.hasComposableAnnotation()
-            }
-    }
-
-    private fun isComposableLambda(lambda: KtLambdaExpression): Boolean {
-        val lambdaArgument = lambda.parent as? KtValueArgument ?: return false
-        val call = generateSequence(lambdaArgument.parent) { it.parent }
-            .firstOrNull { it is KtCallExpression } as? KtCallExpression
-            ?: return false
-        val declaration = call.calleeExpression?.references?.firstOrNull()?.resolve() as? KtCallableDeclaration
-        if (declaration == null) {
-            val functionName = call.calleeExpression?.text
-                ?.substringAfterLast('.')
-                ?: return false
-            if (lambdaArgument.getArgumentName()?.asName?.asString()?.startsWith("on") == true) return false
-            if (functionName in NON_COMPOSABLE_LAMBDA_FUNCTIONS) return false
-            if (functionName in COMPOSABLE_LAMBDA_FUNCTIONS) return true
-            return functionName.firstOrNull()?.isUpperCase() == true
-        }
-        val parameterName = lambdaArgument.getArgumentName()?.asName?.asString()
-        val parameter = parameterName?.let { name ->
-            declaration.valueParameters.firstOrNull { it.name == name }
-        } ?: call.valueArguments.indexOf(lambdaArgument).takeIf { it >= 0 }?.let { index ->
-            declaration.valueParameters.getOrNull(index)
-        } ?: declaration.valueParameters.lastOrNull()
-        return parameter?.typeReference?.hasComposableAnnotation() == true
+            .any { it.hasComposableAnnotation() }
     }
 
     private fun KtAnnotated.hasComposableAnnotation(): Boolean = annotationEntries.any { entry ->
@@ -258,28 +210,6 @@ internal class ComposeStringResourceIntentionAction(
     private companion object {
         const val STRING_RESOURCE_IMPORT = "org.jetbrains.compose.resources.stringResource"
         const val COMPOSABLE_ANNOTATION = "Composable"
-        val COMPOSABLE_LAMBDA_FUNCTIONS = setOf("application", "setContent", "singleWindowApplication")
-        val NON_COMPOSABLE_LAMBDA_FUNCTIONS = setOf(
-            "also",
-            "async",
-            "collect",
-            "collectLatest",
-            "derivedStateOf",
-            "DisposableEffect",
-            "forEach",
-            "LaunchedEffect",
-            "launch",
-            "let",
-            "map",
-            "produceState",
-            "remember",
-            "rememberSaveable",
-            "run",
-            "runCatching",
-            "SideEffect",
-            "snapshotFlow",
-            "with",
-        )
         val KOTLIN_EXTENSIONS = setOf("kt", "kts")
         val KOTLIN_STRING_LITERAL = Regex("\"\"\"[\\s\\S]*?\"\"\"|\"(?:\\\\.|[^\"\\\\])*\"")
 
