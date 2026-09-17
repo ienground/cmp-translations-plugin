@@ -30,6 +30,23 @@ class ComposeStringsXmlParser {
                             items = items,
                         )
                     }
+                    "plurals" -> {
+                        val items = tag.findSubTags("item")
+                            .mapNotNull { item ->
+                                val quantity = item.getAttributeValue("quantity") ?: return@mapNotNull null
+                                item.value.text.takeIf(String::isNotBlank)?.let { value ->
+                                    ComposeResourceItem(name = quantity, value = value)
+                                }
+                            }
+                        ComposeStringEntry(
+                            key = key,
+                            value = "",
+                            translatable = translatable,
+                            placeholders = items.flatMap(ComposeResourceItem::placeholders),
+                            type = ComposeResourceType.PLURALS,
+                            items = ComposePluralQuantities.sort(items),
+                        )
+                    }
                     else -> null
                 }
             }

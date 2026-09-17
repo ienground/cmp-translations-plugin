@@ -6,6 +6,7 @@ import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiElement
 import zone.ien.cmp_translation_plugin.MyBundle
+import zone.ien.cmp_translation_plugin.resource.ComposePluralQuantities
 import zone.ien.cmp_translation_plugin.resource.ComposeResourceSet
 import zone.ien.cmp_translation_plugin.resource.ComposeResourceType
 import zone.ien.cmp_translation_plugin.write.ComposeResourceWriter
@@ -89,9 +90,19 @@ internal object ComposeTranslationNavigation {
             emptyList()
         } else {
             val itemNames = buildList {
-                defaultEntry?.items?.forEach { add(it.name) }
-                localizedEntries.values.filterNotNull().flatMap { it.items }.forEach { add(it.name) }
-            }.distinct()
+                defaultEntry?.items
+                    ?.filter { type != ComposeResourceType.PLURALS || it.value.isNotBlank() }
+                    ?.forEach { add(it.name) }
+                localizedEntries.values.filterNotNull().flatMap { it.items }
+                    .filter { type != ComposeResourceType.PLURALS || it.value.isNotBlank() }
+                    .forEach { add(it.name) }
+            }.distinct().let { names ->
+                if (type == ComposeResourceType.PLURALS) {
+                    names.sortedWith(compareBy { ComposePluralQuantities.all.indexOf(it).takeIf { index -> index >= 0 } ?: ComposePluralQuantities.all.size })
+                } else {
+                    names
+                }
+            }
             itemNames.map { itemName ->
                 TranslationRow(
                     key = key,
