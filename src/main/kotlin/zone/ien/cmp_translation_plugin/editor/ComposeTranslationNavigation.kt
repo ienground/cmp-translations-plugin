@@ -7,17 +7,18 @@ import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.PsiElement
 import zone.ien.cmp_translation_plugin.MyBundle
 import zone.ien.cmp_translation_plugin.resource.ComposeResourceSet
+import zone.ien.cmp_translation_plugin.resource.ComposeResourceType
 import zone.ien.cmp_translation_plugin.write.ComposeResourceWriter
 
 internal object ComposeTranslationNavigation {
 
     private val resourceKeyPattern = Regex("[A-Za-z_][A-Za-z0-9_]*")
-    private val composeStringReferencePattern = Regex(
-        "(?<![A-Za-z0-9_])(?:[A-Za-z_][A-Za-z0-9_]*\\.)*Res\\.string\\.([A-Za-z_][A-Za-z0-9_]*)(?![A-Za-z0-9_])",
+    private val composeResourceReferencePattern = Regex(
+        "(?<![A-Za-z0-9_])(?:[A-Za-z_][A-Za-z0-9_]*\\.)*Res\\.(?:string|array|plurals)\\.([A-Za-z_][A-Za-z0-9_]*)(?![A-Za-z0-9_])",
     )
 
     fun extractResourceKey(sourceText: String, ancestorTexts: Iterable<String>): String? {
-        composeStringReferencePattern.find(sourceText)?.let { match ->
+        composeResourceReferencePattern.find(sourceText)?.let { match ->
             return match.groupValues[1]
         }
 
@@ -25,7 +26,7 @@ internal object ComposeTranslationNavigation {
         if (!resourceKeyPattern.matches(key)) return null
         return key.takeIf {
             ancestorTexts.any { ancestorText ->
-                composeStringReferencePattern.findAll(ancestorText).any { match ->
+                composeResourceReferencePattern.findAll(ancestorText).any { match ->
                     match.groupValues[1] == key
                 }
             }
@@ -76,17 +77,50 @@ internal object ComposeTranslationNavigation {
 
     fun rowFor(resourceSet: ComposeResourceSet, key: String): TranslationRow? {
         val defaultEntry = resourceSet.defaultDocument?.entries?.firstOrNull { it.key == key }
-        val localizedValues = resourceSet.localizedDocuments.associate { document ->
-            document.descriptor.qualifier to document.entries.firstOrNull { it.key == key }?.value
+        val localizedEntries = resourceSet.localizedDocuments.associate { document ->
+            document.descriptor.qualifier to document.entries.firstOrNull { it.key == key }
         }
-        if (defaultEntry == null && localizedValues.values.all { it == null }) return null
+        if (defaultEntry == null && localizedEntries.values.all { it == null }) return null
+
+        val type = defaultEntry?.type
+            ?: localizedEntries.values.firstNotNullOfOrNull { it?.type }
+            ?: ComposeResourceType.STRING
+        val children = if (type == ComposeResourceType.STRING) {
+            emptyList()
+        } else {
+            val itemNames = buildList {
+                defaultEntry?.items?.forEach { add(it.name) }
+                localizedEntries.values.filterNotNull().flatMap { it.items }.forEach { add(it.name) }
+            }.distinct()
+            itemNames.map { itemName ->
+                TranslationRow(
+                    key = key,
+                    defaultValue = defaultEntry?.items?.firstOrNull { it.name == itemName }?.value,
+                    localizedValues = localizedEntries.mapValues { (_, entry) ->
+                        entry?.items?.firstOrNull { it.name == itemName }?.value
+                    },
+                    issues = emptyList(),
+                    translatable = defaultEntry?.translatable ?: true,
+                    resourceType = type,
+                    parentKey = key,
+                    itemName = itemName,
+                    depth = 1,
+                )
+            }
+        }
 
         return TranslationRow(
             key = key,
-            defaultValue = defaultEntry?.value,
-            localizedValues = localizedValues,
+            defaultValue = defaultEntry?.takeIf { type == ComposeResourceType.STRING }?.value,
+            localizedValues = resourceSet.localizedDocuments.associate { document ->
+                document.descriptor.qualifier to localizedEntries[document.descriptor.qualifier]
+                    ?.takeIf { type == ComposeResourceType.STRING }
+                    ?.value
+            },
             issues = emptyList(),
             translatable = defaultEntry?.translatable ?: true,
+            resourceType = type,
+            children = children,
         )
     }
 
@@ -102,18 +136,23 @@ internal object ComposeTranslationNavigation {
             project = project,
             qualifiers = resourceSet.localizedDocuments.map { it.descriptor.qualifier },
             initialRow = row,
+            initialType = row.resourceType,
+            initialArrayItems = resourceSet.defaultDocument?.entries
+                ?.firstOrNull { it.key == key }
+                ?.items
+                .orEmpty(),
+            initialLocalizedItems = resourceSet.localizedDocuments.associate { document ->
+                document.descriptor.qualifier to document.entries.firstOrNull { it.key == key }?.items.orEmpty()
+            },
         )
         if (!dialog.showAndGet()) return true
         val draft = dialog.draft()
 
         ApplicationManager.getApplication().invokeLater {
-            val success = writer.updateStringResource(
+            val success = writer.updateResource(
                 resourceSet = resourceSet,
                 oldKey = row.key,
-                newKey = draft.key,
-                defaultValue = draft.defaultValue,
-                localizedValues = draft.localizedValues,
-                translatable = draft.translatable,
+                draft = draft,
             )
             if (!success) {
                 Messages.showErrorDialog(

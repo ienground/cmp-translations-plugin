@@ -10,6 +10,9 @@ import zone.ien.cmp_translation_plugin.resource.ComposeResourceDocument
 import zone.ien.cmp_translation_plugin.resource.ComposeResourceSet
 import zone.ien.cmp_translation_plugin.resource.ComposeResourceQualifier
 import zone.ien.cmp_translation_plugin.resource.ComposeStringEntry
+import zone.ien.cmp_translation_plugin.resource.ComposeResourceItem
+import zone.ien.cmp_translation_plugin.resource.ComposeResourceType
+import zone.ien.cmp_translation_plugin.editor.StringResourceDraft
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 
@@ -142,6 +145,87 @@ class ComposeResourceWriterTest : BasePlatformTestCase() {
         assertEquals("로그인하기", findStringValue(koDoc, "sign_in"))
     }
 
+    fun testAddsAndUpdatesStringArrayAcrossLocales() {
+        createFile("src/commonMain/composeResources/values/strings.xml", "<resources />")
+        createFile("src/commonMain/composeResources/values-ko/strings.xml", "<resources />")
+        val resourceSet = loadSet()
+        val writer = ComposeResourceWriter(project)
+
+        assertEquals(
+            true,
+            writer.addResource(
+                resourceSet,
+                StringResourceDraft(
+                    key = "menu",
+                    defaultValue = "",
+                    localizedValues = emptyMap(),
+                    translatable = true,
+                    type = ComposeResourceType.STRING_ARRAY,
+                    defaultItems = listOf(
+                        ComposeResourceItem("0", "Home"),
+                        ComposeResourceItem("1", "Settings"),
+                    ),
+                    localizedItems = mapOf(
+                        ComposeResourceQualifier("ko") to listOf(
+                            ComposeResourceItem("0", "홈"),
+                            ComposeResourceItem("1", "설정"),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        commitPsi()
+
+        assertEquals(listOf("Home", "Settings"), findArrayItems(resourceSet.defaultDocument!!.descriptor.file, "menu"))
+        assertEquals(listOf("홈", "설정"), findArrayItems(resourceSet.documentFor(ComposeResourceQualifier("ko"))!!.descriptor.file, "menu"))
+
+        assertEquals(
+            true,
+            writer.updateResource(
+                resourceSet,
+                oldKey = "menu",
+                draft = StringResourceDraft(
+                    key = "menu_items",
+                    defaultValue = "",
+                    localizedValues = emptyMap(),
+                    translatable = true,
+                    type = ComposeResourceType.STRING_ARRAY,
+                    defaultItems = listOf(ComposeResourceItem("0", "Start")),
+                    localizedItems = mapOf(
+                        ComposeResourceQualifier("ko") to listOf(ComposeResourceItem("0", "시작")),
+                    ),
+                ),
+            ),
+        )
+        commitPsi()
+
+        assertEquals(emptyList<String>(), findArrayItems(resourceSet.defaultDocument!!.descriptor.file, "menu"))
+        assertEquals(listOf("Start"), findArrayItems(resourceSet.defaultDocument!!.descriptor.file, "menu_items"))
+        assertEquals(listOf("시작"), findArrayItems(resourceSet.documentFor(ComposeResourceQualifier("ko"))!!.descriptor.file, "menu_items"))
+    }
+
+    fun testDoesNotCreateBlankLocalizedStringArray() {
+        createFile("src/commonMain/composeResources/values/strings.xml", "<resources />")
+        createFile("src/commonMain/composeResources/values-ko/strings.xml", "<resources />")
+        val resourceSet = loadSet()
+
+        ComposeResourceWriter(project).addResource(
+            resourceSet,
+            StringResourceDraft(
+                key = "menu",
+                defaultValue = "",
+                localizedValues = emptyMap(),
+                translatable = true,
+                type = ComposeResourceType.STRING_ARRAY,
+                defaultItems = listOf(ComposeResourceItem("0", "Home")),
+                localizedItems = mapOf(ComposeResourceQualifier("ko") to listOf(ComposeResourceItem("0", ""))),
+            ),
+        )
+        commitPsi()
+
+        assertEquals(emptyList<String>(), findArrayItems(resourceSet.documentFor(ComposeResourceQualifier("ko"))!!.descriptor.file, "menu"))
+    }
+
     private fun loadSet(): ComposeResourceSet = ComposeResourceCatalog(project).load().single()
 
     private fun createFile(path: String, text: String): VirtualFile =
@@ -157,5 +241,14 @@ class ComposeResourceWriterTest : BasePlatformTestCase() {
             ?.firstOrNull { it.getAttributeValue("name") == key }
             ?.value
             ?.text
+    }
+
+    private fun findArrayItems(file: VirtualFile, key: String): List<String> {
+        val xmlFile = PsiManager.getInstance(project).findFile(file) as? XmlFile ?: return emptyList()
+        return xmlFile.rootTag?.findSubTags("string-array")
+            ?.firstOrNull { it.getAttributeValue("name") == key }
+            ?.findSubTags("item")
+            ?.map { it.value.text }
+            .orEmpty()
     }
 }

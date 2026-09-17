@@ -2,10 +2,6 @@ package zone.ien.cmp_translation_plugin.editor
 
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.intellij.pom.Navigatable
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import zone.ien.cmp_translation_plugin.resource.ComposeResourceCatalog
 import zone.ien.cmp_translation_plugin.resource.ComposeResourceQualifier
 
@@ -16,6 +12,13 @@ class ComposeTranslationNavigationTest : BasePlatformTestCase() {
             "login",
             ComposeTranslationNavigation.extractResourceKey(
                 sourceText = "Res.string.login",
+                ancestorTexts = emptyList(),
+            ),
+        )
+        assertEquals(
+            "menu",
+            ComposeTranslationNavigation.extractResourceKey(
+                sourceText = "Res.array.menu",
                 ancestorTexts = emptyList(),
             ),
         )
