@@ -2,8 +2,6 @@ package zone.ien.cmp_translation_plugin.editor
 
 import com.intellij.openapi.editor.impl.DocumentImpl
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import zone.ien.cmp_translation_plugin.resource.ComposeResourceQualifier
 
 class ComposeTranslationFoldingBuilderTest : BasePlatformTestCase() {

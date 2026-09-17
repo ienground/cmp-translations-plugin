@@ -2,7 +2,6 @@ package zone.ien.cmp_translation_plugin.editor
 
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.intellij.ui.components.JBTextField
-import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DataContext
 import com.intellij.openapi.actionSystem.ToggleAction
@@ -12,7 +11,6 @@ import java.awt.Font
 import java.awt.FontMetrics
 import java.awt.Insets
 import java.awt.image.BufferedImage
-import java.awt.event.MouseEvent
 import javax.swing.JButton
 import javax.swing.JComboBox
 import javax.swing.JList
@@ -27,11 +25,7 @@ import zone.ien.cmp_translation_plugin.MyBundle
 import zone.ien.cmp_translation_plugin.resource.ComposeResourceQualifier
 import zone.ien.cmp_translation_plugin.resource.ComposeResourceType
 import zone.ien.cmp_translation_plugin.resource.ComposeResourceItem
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertTrue
 
 class ComposeTranslationToolWindowTest : BasePlatformTestCase() {
 
