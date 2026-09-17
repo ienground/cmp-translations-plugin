@@ -2,11 +2,8 @@ package zone.ien.cmp_translation_plugin.editor
 
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.intellij.pom.Navigatable
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertNull
-import org.junit.Assert.assertTrue
 import zone.ien.cmp_translation_plugin.resource.ComposeResourceCatalog
+import zone.ien.cmp_translation_plugin.resource.ComposeResourceQualifier
 
 class ComposeTranslationNavigationTest : BasePlatformTestCase() {
 
@@ -15,6 +12,13 @@ class ComposeTranslationNavigationTest : BasePlatformTestCase() {
             "login",
             ComposeTranslationNavigation.extractResourceKey(
                 sourceText = "Res.string.login",
+                ancestorTexts = emptyList(),
+            ),
+        )
+        assertEquals(
+            "menu",
+            ComposeTranslationNavigation.extractResourceKey(
+                sourceText = "Res.array.menu",
                 ancestorTexts = emptyList(),
             ),
         )
@@ -74,6 +78,39 @@ class ComposeTranslationNavigationTest : BasePlatformTestCase() {
         )
 
         assertEquals("commonMain", selected?.sourceSetName)
+    }
+
+    fun testSelectedLanguageResolvesLocalizedValueAndFallsBackToDefault() {
+        myFixture.tempDirFixture.createFile(
+            "src/commonMain/composeResources/values/strings.xml",
+            "<resources><string name=\"close\">Close</string></resources>",
+        )
+        myFixture.tempDirFixture.createFile(
+            "src/commonMain/composeResources/values-ko/strings.xml",
+            "<resources><string name=\"close\">닫기</string></resources>",
+        )
+        val resourceSet = ComposeResourceCatalog(project).load().single()
+
+        assertEquals(
+            listOf(ComposeResourceQualifier.DEFAULT, ComposeResourceQualifier("ko")),
+            ComposeTranslationLanguageSelection.options(resourceSet),
+        )
+        assertEquals(
+            "닫기",
+            ComposeTranslationLanguageSelection.value(
+                resourceSet = resourceSet,
+                key = "close",
+                qualifier = ComposeResourceQualifier("ko"),
+            ),
+        )
+        assertEquals(
+            "Close",
+            ComposeTranslationLanguageSelection.value(
+                resourceSet = resourceSet,
+                key = "close",
+                qualifier = ComposeResourceQualifier("ja"),
+            ),
+        )
     }
 
     fun testGotoHandlerReturnsNavigableTranslationTarget() {

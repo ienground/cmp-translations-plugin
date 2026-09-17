@@ -39,4 +39,49 @@ class ComposeStringsXmlParserTest : BasePlatformTestCase() {
 
         assertEquals(listOf(ComposeStringEntry("valid", "Valid")), entries)
     }
+
+    fun testParsesStringArrayItemsAsTypedResourceEntry() {
+        val psiFile = myFixture.configureByText(
+            XmlFileType.INSTANCE,
+            """
+            <resources>
+                <string-array name="menu">
+                    <item>Home</item>
+                    <item>Settings</item>
+                </string-array>
+            </resources>
+            """.trimIndent(),
+        )
+
+        val entry = ComposeStringsXmlParser()
+            .parse(assertInstanceOf(psiFile, XmlFile::class.java))
+            .single()
+
+        assertEquals(ComposeResourceType.STRING_ARRAY, entry.type)
+        assertEquals(listOf("0", "1"), entry.items.map(ComposeResourceItem::name))
+        assertEquals(listOf("Home", "Settings"), entry.items.map(ComposeResourceItem::value))
+    }
+
+    fun testParsesPluralQuantitiesAndSkipsBlankItems() {
+        val psiFile = myFixture.configureByText(
+            XmlFileType.INSTANCE,
+            """
+            <resources>
+                <plurals name="inbox_count">
+                    <item quantity="one">%d message</item>
+                    <item quantity="zero"></item>
+                    <item quantity="other">%d messages</item>
+                </plurals>
+            </resources>
+            """.trimIndent(),
+        )
+
+        val entry = ComposeStringsXmlParser()
+            .parse(assertInstanceOf(psiFile, XmlFile::class.java))
+            .single()
+
+        assertEquals(ComposeResourceType.PLURALS, entry.type)
+        assertEquals(listOf("one", "other"), entry.items.map(ComposeResourceItem::name))
+        assertEquals(listOf("%d message", "%d messages"), entry.items.map(ComposeResourceItem::value))
+    }
 }

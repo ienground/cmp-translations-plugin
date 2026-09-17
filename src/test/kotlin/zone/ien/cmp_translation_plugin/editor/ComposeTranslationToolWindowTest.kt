@@ -2,7 +2,6 @@ package zone.ien.cmp_translation_plugin.editor
 
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.intellij.ui.components.JBTextField
-import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.DataContext
 import com.intellij.openapi.actionSystem.ToggleAction
@@ -12,8 +11,8 @@ import java.awt.Font
 import java.awt.FontMetrics
 import java.awt.Insets
 import java.awt.image.BufferedImage
-import java.awt.event.MouseEvent
 import javax.swing.JButton
+import javax.swing.JCheckBox
 import javax.swing.JComboBox
 import javax.swing.JList
 import javax.swing.JLabel
@@ -22,14 +21,14 @@ import javax.swing.JPanel
 import javax.swing.JTable
 import javax.swing.JTextField
 import javax.swing.SwingUtilities
+import java.awt.Container
+import java.awt.event.MouseEvent
 import java.util.concurrent.atomic.AtomicReference
 import zone.ien.cmp_translation_plugin.MyBundle
 import zone.ien.cmp_translation_plugin.resource.ComposeResourceQualifier
-import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
+import zone.ien.cmp_translation_plugin.resource.ComposeResourceType
+import zone.ien.cmp_translation_plugin.resource.ComposeResourceItem
 import org.junit.Assert.assertNotEquals
-import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertTrue
 
 class ComposeTranslationToolWindowTest : BasePlatformTestCase() {
 
@@ -159,7 +158,7 @@ class ComposeTranslationToolWindowTest : BasePlatformTestCase() {
 
         val content = ComposeTranslationToolWindow(project).component
         val searchField = descendants(content).filterIsInstance<EllipsisTextField>().single()
-        val combo = descendants(content).filterIsInstance<JComboBox<*>>().first()
+        val combo = resourceSetCombo(content)
         @Suppress("UNCHECKED_CAST")
         val renderer = combo.renderer as ListCellRenderer<Any?>
         val rendered = renderer.getListCellRendererComponent(
@@ -227,10 +226,11 @@ class ComposeTranslationToolWindowTest : BasePlatformTestCase() {
 
         val content = ComposeTranslationToolWindow(project).component
         val searchField = descendants(content).filterIsInstance<JBTextField>().single()
-        val combo = descendants(content).filterIsInstance<JComboBox<*>>().first()
+        val combo = resourceSetCombo(content)
         val status = descendants(content).filterIsInstance<JLabel>().single { label ->
             label.text != MyBundle.message("translation.resource-set.label") &&
-                label.text != MyBundle.message("translation.search.label")
+                label.text != MyBundle.message("translation.search.label") &&
+                label.text != MyBundle.message("translation.display-language.label")
         }
         val option = combo.selectedItem as ResourceSetOption
 
@@ -370,6 +370,265 @@ class ComposeTranslationToolWindowTest : BasePlatformTestCase() {
         assertEquals("", draft.localizedValues[ComposeResourceQualifier("ko")])
     }
 
+    fun testAddStringDialogSwitchesBetweenStringAndStringArrayTypes() {
+        val dialog = AddStringDialog(
+            project = project,
+            qualifiers = listOf(ComposeResourceQualifier("ko")),
+            initialKey = "menu",
+        )
+        val radios = dialog.typeRadioButtons
+        val arrayRadio = radios.single { it.text == "String array" }
+
+        assertEquals(ComposeResourceType.STRING, dialog.draft().type)
+        arrayRadio.doClick()
+        assertEquals(ComposeResourceType.STRING_ARRAY, dialog.draft().type)
+        assertEquals(listOf("0"), dialog.draft().defaultItems.map(ComposeResourceItem::name))
+    }
+
+    fun testPluralDialogPrefillsAllQuantityFields() {
+        val dialog = AddStringDialog(
+            project = project,
+            qualifiers = listOf(ComposeResourceQualifier("ko")),
+            initialKey = "inbox_count",
+            initialType = ComposeResourceType.PLURALS,
+        )
+
+        val draft = dialog.draft()
+
+        assertEquals(ComposeResourceType.PLURALS, draft.type)
+        assertEquals(listOf("zero", "one", "two", "few", "many", "other"), draft.defaultItems.map(ComposeResourceItem::name))
+        assertEquals(
+            listOf("zero", "one", "two", "few", "many", "other"),
+            draft.localizedItems.getValue(ComposeResourceQualifier("ko")).map(ComposeResourceItem::name),
+        )
+        assertTrue(draft.defaultItems.all { it.value.isEmpty() })
+    }
+
+    fun testPluralDialogKeepsLocalizedValuesInTheirLocaleFields() {
+        val ko = ComposeResourceQualifier("ko")
+        val dialog = AddStringDialog(
+            project = project,
+            qualifiers = listOf(ko),
+            initialKey = "inbox_count",
+            initialType = ComposeResourceType.PLURALS,
+            initialLocalizedItems = mapOf(ko to listOf(ComposeResourceItem("one", "메시지 1개"))),
+        )
+
+        val draft = dialog.draft()
+
+        assertEquals("", draft.defaultItems.first { it.name == "one" }.value)
+        assertEquals("메시지 1개", draft.localizedItems.getValue(ko).first { it.name == "one" }.value)
+    }
+
+    fun testPluralQuantityLabelsUseTheSameWidth() {
+        val dialog = AddStringDialog(
+            project = project,
+            qualifiers = emptyList(),
+            initialType = ComposeResourceType.PLURALS,
+        )
+
+        val labels = descendants(dialogContent(dialog))
+            .filterIsInstance<JLabel>()
+            .filter { it.text in setOf("[zero]", "[one]", "[two]", "[few]", "[many]", "[other]") }
+
+        assertEquals(6, labels.size)
+        assertEquals(1, labels.map { it.preferredSize.width }.distinct().size)
+    }
+
+    fun testToolWindowHidesBlankPluralQuantityRows() {
+        myFixture.tempDirFixture.createFile(
+            "src/commonMain/composeResources/values/strings.xml",
+            """
+            <resources>
+                <plurals name="inbox_count">
+                    <item quantity="zero"></item>
+                    <item quantity="one">%d message</item>
+                    <item quantity="other">%d messages</item>
+                </plurals>
+            </resources>
+            """.trimIndent(),
+        )
+
+        val content = ComposeTranslationToolWindow(project).component
+        val table = descendants(content).filterIsInstance<JTable>().single()
+
+        assertEquals(3, table.rowCount)
+        assertEquals(listOf("inbox_count", "└ one", "└ other"), (0 until table.rowCount).map { table.getValueAt(it, 0).toString() })
+    }
+
+    fun testStringArrayDialogInitiallyShowsArrayFields() {
+        val dialog = AddStringDialog(
+            project = project,
+            qualifiers = emptyList(),
+            initialType = ComposeResourceType.STRING_ARRAY,
+            initialArrayItems = listOf(ComposeResourceItem("0", "Zero")),
+        )
+
+        dialogContent(dialog)
+        val visibleCard = typeCards(dialog).components.single { it.isVisible }
+
+        assertTrue(descendants(visibleCard).contains(arrayItemsPanel(dialog)))
+    }
+
+    fun testStringArrayItemsAreRenumberedAfterDeleteAndAdd() {
+        val dialog = AddStringDialog(
+            project = project,
+            qualifiers = emptyList(),
+            initialType = ComposeResourceType.STRING_ARRAY,
+            initialArrayItems = listOf(
+                ComposeResourceItem("0", "Zero"),
+                ComposeResourceItem("1", "One"),
+                ComposeResourceItem("2", "Two"),
+                ComposeResourceItem("3", "Three"),
+            ),
+        )
+
+        val content = dialogContent(dialog)
+        val removeButtons = arrayRemoveButtons(content)
+        assertEquals(4, removeButtons.size)
+        assertEquals(MyBundle.message("translation.dialog.array.remove-item"), removeButtons.first().text)
+
+        removeButtons[1].doClick()
+        assertEquals(listOf("0", "1", "2"), dialog.draft().defaultItems.map(ComposeResourceItem::name))
+
+        arrayRemoveButtons(content).first().doClick()
+        assertEquals(listOf("0", "1"), dialog.draft().defaultItems.map(ComposeResourceItem::name))
+
+        descendants(content)
+            .filterIsInstance<JButton>()
+            .first { it.text == MyBundle.message("translation.dialog.array.add-item") }
+            .doClick()
+        assertEquals(listOf("0", "1", "2"), dialog.draft().defaultItems.map(ComposeResourceItem::name))
+    }
+
+    fun testStringArrayRowsStayPackedAndTextFieldsFillAvailableWidth() {
+        val dialog = AddStringDialog(
+            project = project,
+            qualifiers = emptyList(),
+            initialType = ComposeResourceType.STRING_ARRAY,
+            initialArrayItems = listOf(
+                ComposeResourceItem("0", "Zero"),
+                ComposeResourceItem("1", "One"),
+            ),
+        )
+        val content = arrayItemsPanel(dialog)
+        content.setSize(900, 600)
+        layoutRecursively(content)
+
+        val rows = arrayRows(dialog)
+        assertEquals(2, rows.size)
+        assertEquals(rows[0].y + rows[0].height, rows[1].y)
+        rows.forEach { row ->
+            val field = descendants(row).filterIsInstance<JBTextField>().single()
+            assertTrue(field.width > 500)
+        }
+    }
+
+    fun testStringArrayRowsStayPackedWhenDialogCardGrows() {
+        val dialog = AddStringDialog(
+            project = project,
+            qualifiers = emptyList(),
+            initialType = ComposeResourceType.STRING_ARRAY,
+            initialArrayItems = listOf(
+                ComposeResourceItem("0", "Zero"),
+                ComposeResourceItem("1", "One"),
+            ),
+        )
+        val content = dialogContent(dialog)
+        content.setSize(900, 900)
+        layoutRecursively(content)
+
+        val scrollPane = descendants(content).filterIsInstance<javax.swing.JScrollPane>().last()
+        scrollPane.setSize(860, 700)
+        layoutRecursively(scrollPane)
+
+        val rows = arrayRows(dialog)
+        assertEquals(2, rows.size)
+        assertEquals(rows[0].y + rows[0].height, rows[1].y)
+    }
+
+    fun testArrayExpandArrowDoesNotStartKeyEditing() {
+        myFixture.tempDirFixture.createFile(
+            "src/commonMain/composeResources/values/strings.xml",
+            "<resources><string-array name=\"menu\"><item>Home</item><item>Settings</item></string-array></resources>",
+        )
+
+        val content = ComposeTranslationToolWindow(project).component
+        val table = descendants(content).filterIsInstance<JTable>().single()
+        val cell = table.getCellRect(0, 0, false)
+        val event = MouseEvent(
+            table,
+            MouseEvent.MOUSE_PRESSED,
+            System.currentTimeMillis(),
+            0,
+            cell.x + 8,
+            cell.y + 8,
+            1,
+            false,
+            MouseEvent.BUTTON1,
+        )
+
+        assertFalse(table.editCellAt(0, 0, event))
+    }
+
+    fun testToolWindowDisplaysExpandedStringArrayRowsWithIndentedKeys() {
+        myFixture.tempDirFixture.createFile(
+            "src/commonMain/composeResources/values/strings.xml",
+            """
+            <resources>
+                <string-array name="menu"><item>Home</item><item>Settings</item></string-array>
+            </resources>
+            """.trimIndent(),
+        )
+        myFixture.tempDirFixture.createFile(
+            "src/commonMain/composeResources/values-ko/strings.xml",
+            """
+            <resources>
+                <string-array name="menu"><item>홈</item><item>설정</item></string-array>
+            </resources>
+            """.trimIndent(),
+        )
+
+        val content = ComposeTranslationToolWindow(project).component
+        val table = descendants(content).filterIsInstance<JTable>().single()
+        val renderer = table.columnModel.getColumn(0).cellRenderer
+
+        assertEquals(3, table.rowCount)
+        assertTrue(table.getValueAt(1, 0).toString().contains("0"))
+        val rendered = renderer.getTableCellRendererComponent(table, table.getValueAt(1, 0), false, false, 1, 0)
+        assertTrue((rendered as JLabel).text.contains("└ 0"))
+    }
+
+    fun testStringArrayChildrenHideUntranslatableCheckbox() {
+        myFixture.tempDirFixture.createFile(
+            "src/commonMain/composeResources/values/strings.xml",
+            "<resources><string-array name=\"menu\"><item>Home</item></string-array></resources>",
+        )
+
+        val content = ComposeTranslationToolWindow(project).component
+        val table = descendants(content).filterIsInstance<JTable>().single()
+        val childRenderer = table.getCellRenderer(1, 1)
+        val childComponent = childRenderer.getTableCellRendererComponent(
+            table,
+            table.getValueAt(1, 1),
+            false,
+            false,
+            1,
+            1,
+        )
+        val parentComponent = table.getCellRenderer(0, 1).getTableCellRendererComponent(
+            table,
+            table.getValueAt(0, 1),
+            false,
+            false,
+            0,
+            1,
+        )
+
+        assertFalse(descendants(childComponent).any { it is JCheckBox })
+        assertTrue(descendants(parentComponent).any { it is JCheckBox })
+    }
+
     fun testToolbarWrapsWhenWindowBecomesNarrow() {
         createResourceFiles()
 
@@ -393,7 +652,7 @@ class ComposeTranslationToolWindowTest : BasePlatformTestCase() {
         )
 
         val content = ComposeTranslationToolWindow(project).component
-        val combo = descendants(content).filterIsInstance<JComboBox<*>>().first()
+        val combo = resourceSetCombo(content)
         assertEquals(2, combo.itemCount)
 
         @Suppress("UNCHECKED_CAST")
@@ -408,6 +667,24 @@ class ComposeTranslationToolWindowTest : BasePlatformTestCase() {
 
         val moduleBadge = descendants(rendered).filterIsInstance<ModuleBadge>().single()
         assertTrue(moduleBadge.text.isNotBlank())
+    }
+
+    fun testLanguageSelectorShowsResourceLocalesAndUpdatesDisplaySetting() {
+        createResourceFiles()
+
+        val content = ComposeTranslationToolWindow(project).component
+        val combos = descendants(content).filterIsInstance<JComboBox<*>>()
+        val languageCombo = combos.single { combo ->
+            combo.itemCount == 2 &&
+                (combo.getItemAt(1) as? ComposeResourceQualifier)?.rawValue == "ko"
+        }
+
+        languageCombo.selectedItem = ComposeResourceQualifier("ko")
+
+        assertEquals(
+            ComposeResourceQualifier("ko"),
+            ComposeTranslationDisplaySettings.getInstance(project).selectedQualifier,
+        )
     }
 
     private fun createResourceFiles(localizedXml: String = "<resources><string name=\"login\">로그인</string></resources>") {
@@ -427,6 +704,38 @@ class ComposeTranslationToolWindowTest : BasePlatformTestCase() {
             component.components.forEach { addAll(descendants(it)) }
         }
     }
+
+    private fun resourceSetCombo(content: Component): JComboBox<*> =
+        descendants(content).filterIsInstance<JComboBox<*>>().single { combo ->
+            combo.getItemAt(0) is ResourceSetOption
+        }
+
+    private fun arrayRemoveButtons(content: Component): List<JButton> =
+        descendants(content)
+            .filterIsInstance<JButton>()
+            .filter { it.text == MyBundle.message("translation.dialog.array.remove-item") }
+
+    private fun arrayRows(dialog: AddStringDialog): List<Container> =
+        descendants(arrayItemsPanel(dialog))
+            .filterIsInstance<Container>()
+            .filter { container ->
+                container.components.any { component ->
+                    component is JLabel && component.text.matches(Regex("\\[\\d+\\]"))
+                }
+            }
+            .sortedBy { it.y }
+
+    private fun arrayItemsPanel(dialog: AddStringDialog): JPanel =
+        AddStringDialog::class.java.getDeclaredField("arrayItemsPanel").apply { isAccessible = true }
+            .get(dialog) as JPanel
+
+    private fun typeCards(dialog: AddStringDialog): JPanel =
+        AddStringDialog::class.java.getDeclaredField("typeCards").apply { isAccessible = true }
+            .get(dialog) as JPanel
+
+    private fun dialogContent(dialog: AddStringDialog): Component =
+        AddStringDialog::class.java.getDeclaredMethod("createCenterPanel").apply { isAccessible = true }
+            .invoke(dialog) as Component
 
     private fun layoutRecursively(component: Component) {
         if (component !is java.awt.Container) return

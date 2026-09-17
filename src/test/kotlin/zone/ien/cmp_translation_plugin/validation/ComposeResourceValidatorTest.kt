@@ -2,6 +2,8 @@ package zone.ien.cmp_translation_plugin.validation
 
 import zone.ien.cmp_translation_plugin.resource.ComposeResourceQualifier
 import zone.ien.cmp_translation_plugin.resource.ComposeStringEntry
+import zone.ien.cmp_translation_plugin.resource.ComposeResourceItem
+import zone.ien.cmp_translation_plugin.resource.ComposeResourceType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -61,5 +63,37 @@ class ComposeResourceValidatorTest {
                     it.qualifier == ko
             },
         )
+    }
+
+    @Test
+    fun reportsMissingAndMismatchedStringArrayItems() {
+        val array = ComposeResourceType.STRING_ARRAY
+        val issues = ComposeResourceValidator().validate(
+            defaultEntries = listOf(
+                ComposeStringEntry(
+                    key = "menu",
+                    value = "",
+                    type = array,
+                    items = listOf(
+                        ComposeResourceItem("0", "Home"),
+                        ComposeResourceItem("1", "Settings, %s"),
+                    ),
+                ),
+            ),
+            localizedEntries = mapOf(
+                ko to listOf(
+                    ComposeStringEntry(
+                        key = "menu",
+                        value = "",
+                        type = array,
+                        items = listOf(ComposeResourceItem("0", "홈")),
+                    ),
+                ),
+            ),
+        )
+
+        assertTrue(issues.any {
+            it.type == ComposeResourceIssueType.MISSING_ITEM && it.key == "menu" && it.itemName == "1"
+        })
     }
 }

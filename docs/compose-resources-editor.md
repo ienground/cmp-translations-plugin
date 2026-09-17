@@ -37,7 +37,7 @@ src/<source-set>/composeResources/values-<qualifier>/strings.xml
 - `editor`: Tool Window, 테이블 모델, 검색·필터·navigation
 - `write`: XML PSI와 `WriteCommandAction`을 사용하는 추가·수정·삭제
 
-현재는 단일 Gradle 모듈을 사용하며, 기능 경계는 패키지 단위로 분리합니다. AI 번역 provider, plural, string-array, CSV 입출력은 core resource/editor 로직과 분리해 후속 기능으로 추가할 수 있습니다.
+현재는 단일 Gradle 모듈을 사용하며, 기능 경계는 패키지 단위로 분리합니다. String과 string-array는 공통 resource/editor 모델로 처리하며, `ComposeResourceType.PLURALS`를 통해 plural 확장 지점을 유지합니다. AI 번역 provider, plural, CSV 입출력은 후속 기능으로 추가할 수 있습니다.
 
 ## 검증
 

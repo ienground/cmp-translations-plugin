@@ -1,7 +1,6 @@
 package zone.ien.cmp_translation_plugin.resource
 
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
-import org.junit.Assert.assertEquals
 
 class ComposeResourceLocatorTest : BasePlatformTestCase() {
 

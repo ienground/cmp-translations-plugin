@@ -1,19 +1,20 @@
 package zone.ien.cmp_translation_plugin.editor
 
+import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer
+import com.intellij.codeInsight.folding.CodeFoldingManager
 import com.intellij.icons.AllIcons
-import com.intellij.openapi.actionSystem.AnAction
-import com.intellij.openapi.actionSystem.DataContext
-import com.intellij.openapi.actionSystem.DefaultActionGroup
-import com.intellij.openapi.actionSystem.AnActionEvent
-import com.intellij.openapi.actionSystem.ToggleAction
+import com.intellij.ide.BrowserUtil
+import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.application.WriteIntentReadAction
+import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.fileEditor.OpenFileDescriptor
+import com.intellij.openapi.fileEditor.TextEditor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.ui.ValidationInfo
-import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.util.Computable
 import com.intellij.openapi.vfs.VirtualFileManager
@@ -22,7 +23,6 @@ import com.intellij.openapi.vfs.newvfs.events.VFileEvent
 import com.intellij.psi.PsiManager
 import com.intellij.ui.DocumentAdapter
 import com.intellij.ui.JBColor
-import com.intellij.ide.BrowserUtil
 import com.intellij.ui.components.ActionLink
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBTextField
@@ -33,43 +33,16 @@ import com.intellij.ui.table.JBTable
 import com.intellij.util.IconUtil
 import com.intellij.util.ui.JBUI
 import zone.ien.cmp_translation_plugin.MyBundle
-import zone.ien.cmp_translation_plugin.resource.ComposeResourceCatalog
-import zone.ien.cmp_translation_plugin.resource.ComposeResourceChangeFilter
-import zone.ien.cmp_translation_plugin.resource.ComposeResourceQualifier
-import zone.ien.cmp_translation_plugin.resource.ComposeResourceSet
+import zone.ien.cmp_translation_plugin.resource.*
 import zone.ien.cmp_translation_plugin.validation.ComposeResourceValidator
 import zone.ien.cmp_translation_plugin.write.ComposeResourceWriter
-import java.awt.BorderLayout
-import java.awt.Color
-import java.awt.Component
-import java.awt.Container
-import java.awt.Dimension
-import java.awt.Font
-import java.awt.FlowLayout
-import java.awt.Graphics
-import java.awt.Graphics2D
-import java.awt.GridBagConstraints
-import java.awt.GridBagLayout
-import java.awt.FontMetrics
-import java.awt.RenderingHints
-import java.awt.Insets
+import java.awt.*
 import java.awt.event.ComponentAdapter
 import java.awt.event.ComponentEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
-import javax.swing.DefaultComboBoxModel
-import javax.swing.DefaultCellEditor
-import javax.swing.JButton
-import javax.swing.JComponent
-import javax.swing.JList
-import javax.swing.JLabel
-import javax.swing.ListCellRenderer
-import javax.swing.JPanel
-import javax.swing.JScrollPane
-import javax.swing.JTable
-import javax.swing.JTextField
-import javax.swing.Icon
-import javax.swing.UIManager
+import java.util.EventObject
+import javax.swing.*
 import javax.swing.event.DocumentEvent
 import javax.swing.table.DefaultTableCellRenderer
 
@@ -85,7 +58,7 @@ internal data class ResourceSetOption(val resourceSet: ComposeResourceSet) {
 class ComposeTranslationToolWindow(private val project: Project) {
 
     private val tableModel = ComposeTranslationTableModel()
-    private val table = JBTable(tableModel)
+    private val table = TranslationTable(tableModel)
     private val searchField = EllipsisTextField()
     private val filterButton = TranslationFilterButton { filter ->
         tableModel.filter = filter
@@ -94,6 +67,9 @@ class ComposeTranslationToolWindow(private val project: Project) {
         renderer = ResourceSetOptionRenderer()
     }
     private val resourceSetControl = FlexibleControlHost(resourceSetCombo)
+    private val languageCombo = ComboBox<ComposeResourceQualifier>().apply {
+        renderer = TranslationLanguageRenderer()
+    }
     private val statusLabel = JBLabel()
     private val catalog = ComposeResourceCatalog(project)
     private val validator = ComposeResourceValidator()
@@ -108,12 +84,23 @@ class ComposeTranslationToolWindow(private val project: Project) {
         configureTable()
         searchField.emptyText.text = MyBundle.message("translation.search.placeholder")
         tableModel.onValueEdited = { key, qualifier, value -> editValue(key, qualifier, value) }
+        tableModel.onItemValueEdited = { key, itemName, qualifier, value ->
+            editItemValue(key, itemName, qualifier, value)
+        }
         tableModel.onKeyEdited = ::editKey
         tableModel.onTranslatableEdited = ::editTranslatable
         table.addMouseListener(object : MouseAdapter() {
             override fun mouseClicked(event: MouseEvent) {
+                val row = table.rowAtPoint(event.point)
+                val modelRow = row.takeIf { it >= 0 }?.let(table::convertRowIndexToModel)
+                if (row >= 0 && table.isExpansionToggleHit(row, event)) {
+                    if (event.clickCount == 1 && modelRow != null) {
+                        tableModel.toggleExpanded(modelRow)
+                    }
+                    if (table.isEditing) table.cellEditor?.cancelCellEditing()
+                    return
+                }
                 if (event.clickCount == 2 && event.button == MouseEvent.BUTTON1) {
-                    val row = table.rowAtPoint(event.point)
                     if (row >= 0) {
                         editRowInDialog(row)
                     }
@@ -130,7 +117,20 @@ class ComposeTranslationToolWindow(private val project: Project) {
                 if (table.isEditing) table.cellEditor?.stopCellEditing()
             }
         })
-        resourceSetCombo.addActionListener { renderSelectedResourceSet() }
+        resourceSetCombo.addActionListener {
+            applyLanguageOptions(selectedResourceSet())
+            renderSelectedResourceSet()
+        }
+        languageCombo.addActionListener {
+            val qualifier = languageCombo.selectedItem as? ComposeResourceQualifier ?: return@addActionListener
+            ComposeTranslationDisplaySettings.getInstance(project).select(qualifier)
+            DaemonCodeAnalyzer.getInstance(project).restart()
+            FileEditorManager.getInstance(project).allEditors
+                .filterIsInstance<TextEditor>()
+                .forEach { editor ->
+                    CodeFoldingManager.getInstance(project).updateFoldRegions(editor.editor)
+                }
+        }
         resourceSetCombo.addFocusListener(object : java.awt.event.FocusAdapter() {
             override fun focusGained(e: java.awt.event.FocusEvent?) {
                 if (table.isEditing) table.cellEditor?.stopCellEditing()
@@ -159,6 +159,7 @@ class ComposeTranslationToolWindow(private val project: Project) {
             onAddString = ::addString,
             onDeleteSelected = ::deleteSelected,
             onRefresh = ::reload,
+            displayLanguage = languageCombo,
         )
         val controls = ResponsiveControlsPanel(
             resourceSetCombo = resourceSetControl,
@@ -209,7 +210,12 @@ class ComposeTranslationToolWindow(private val project: Project) {
         table.autoResizeMode = JTable.AUTO_RESIZE_SUBSEQUENT_COLUMNS
         table.rowHeight = 24
         table.setDefaultRenderer(String::class.java, TranslationCellRenderer())
+        table.setDefaultRenderer(
+            Boolean::class.javaObjectType,
+            TranslationBooleanCellRenderer(table.getDefaultRenderer(Boolean::class.javaObjectType)),
+        )
         table.setDefaultEditor(String::class.java, MissingAwareCellEditor(table.getDefaultEditor(String::class.java)))
+        table.columnModel.getColumn(0).cellRenderer = TranslationKeyCellRenderer()
         
         // Disable JBTable's auto-termination of edits on focus loss.
         // This prevents macOS Korean IME from prematurely committing the cell value
@@ -246,8 +252,19 @@ class ComposeTranslationToolWindow(private val project: Project) {
                 resourceSetCombo.selectedItem = matchingOption
             }
         }
-        
+        applyLanguageOptions((resourceSetCombo.selectedItem as? ResourceSetOption)?.resourceSet)
         renderSelectedResourceSet()
+    }
+
+    private fun applyLanguageOptions(resourceSet: ComposeResourceSet?) {
+        val options = resourceSet?.let(ComposeTranslationLanguageSelection::options).orEmpty()
+        val settings = ComposeTranslationDisplaySettings.getInstance(project)
+        val selected = options.firstOrNull { it == settings.selectedQualifier } ?: options.firstOrNull()
+        languageCombo.model = DefaultComboBoxModel(options.toTypedArray())
+        languageCombo.selectedItem = selected
+        if (selected != null && selected != settings.selectedQualifier) {
+            settings.select(selected)
+        }
     }
 
     private fun renderSelectedResourceSet() {
@@ -268,13 +285,16 @@ class ComposeTranslationToolWindow(private val project: Project) {
             "translation.status.summary",
             resourceSet.moduleName,
             resourceSet.sourceSetName,
-            tableModel.rowCount,
+            tableModel.resourceCount,
             issues.size,
         )
         applyColumnConstraints()
     }
 
     private fun applyColumnConstraints() {
+        if (table.columnCount > 0) {
+            table.columnModel.getColumn(0).cellRenderer = TranslationKeyCellRenderer()
+        }
         if (table.columnCount > 1) {
             table.columnModel.getColumn(1).apply {
                 minWidth = 115
@@ -313,6 +333,31 @@ class ComposeTranslationToolWindow(private val project: Project) {
                 resourceSet.documentFor(qualifier)
             }
             if (document == null || !writer.upsertValue(document, key, value)) {
+                Messages.showErrorDialog(
+                    project,
+                    MyBundle.message("translation.error.locale-edit"),
+                    MyBundle.message("translation.title"),
+                )
+                return@invokeLater
+            }
+            reload()
+        }
+    }
+
+    private fun editItemValue(
+        key: String,
+        itemName: String,
+        qualifier: ComposeResourceQualifier?,
+        value: String,
+    ) {
+        ApplicationManager.getApplication().invokeLater {
+            val resourceSet = selectedResourceSet() ?: return@invokeLater
+            val document = if (qualifier == null) {
+                resourceSet.defaultDocument
+            } else {
+                resourceSet.documentFor(qualifier)
+            }
+            if (document == null || !writer.updateItemValue(document, key, itemName, value)) {
                 Messages.showErrorDialog(
                     project,
                     MyBundle.message("translation.error.locale-edit"),
@@ -383,7 +428,7 @@ class ComposeTranslationToolWindow(private val project: Project) {
         if (!dialog.showAndGet()) return
         val draft = dialog.draft()
         ApplicationManager.getApplication().invokeLater {
-            if (!writer.addStringResource(resourceSet, draft.key, draft.defaultValue, draft.localizedValues, draft.translatable)) {
+            if (!writer.addResource(resourceSet, draft)) {
                 Messages.showErrorDialog(
                     project,
                     MyBundle.message("translation.error.add-failed"),
@@ -442,22 +487,52 @@ class ComposeTranslationToolWindow(private val project: Project) {
                 null
             } else {
                 (psiFile as? com.intellij.psi.xml.XmlFile)?.rootTag
-                    ?.findSubTags("string")
-                    ?.firstOrNull { it.getAttributeValue("name") == row.key }
-                    ?.textRange
-                    ?.startOffset
+                    ?.subTags
+                    ?.firstOrNull { tag ->
+                        tag.getAttributeValue("name") == row.resourceKey &&
+                            tag.name == when (row.resourceType) {
+                                ComposeResourceType.STRING -> "string"
+                                ComposeResourceType.STRING_ARRAY -> "string-array"
+                                ComposeResourceType.PLURALS -> "plurals"
+                            }
+                    }
+                    ?.let { tag ->
+                        if (row.isChild) {
+                            tag.findSubTags("item")
+                                .let { items ->
+                                    if (row.resourceType == ComposeResourceType.PLURALS) {
+                                        items.firstOrNull { it.getAttributeValue("quantity") == row.itemName }
+                                    } else {
+                                        items.getOrNull(row.itemName?.toIntOrNull() ?: -1)
+                                    }
+                                }
+                                ?.textRange
+                                ?.startOffset
+                        } else {
+                            tag.textRange.startOffset
+                        }
+                    }
             }
         }) ?: return
         OpenFileDescriptor(project, document.descriptor.file, offset).navigate(true)
     }
 }
 
-internal data class StringResourceDraft(
-    val key: String,
-    val defaultValue: String,
-    val localizedValues: Map<ComposeResourceQualifier, String>,
-    val translatable: Boolean,
-)
+internal typealias StringResourceDraft = ComposeResourceDraft
+
+private class ArrayItemsPanel : JPanel(), Scrollable {
+
+    override fun getPreferredScrollableViewportSize(): Dimension = preferredSize
+
+    override fun getScrollableUnitIncrement(visibleRect: Rectangle, orientation: Int, direction: Int): Int = 24
+
+    override fun getScrollableBlockIncrement(visibleRect: Rectangle, orientation: Int, direction: Int): Int =
+        visibleRect.height.coerceAtLeast(24)
+
+    override fun getScrollableTracksViewportWidth(): Boolean = true
+
+    override fun getScrollableTracksViewportHeight(): Boolean = false
+}
 
 internal class AddStringDialog(
     project: Project,
@@ -465,6 +540,9 @@ internal class AddStringDialog(
     private val initialRow: TranslationRow? = null,
     private val initialKey: String = "",
     private val initialDefaultValue: String = "",
+    private val initialType: ComposeResourceType = initialRow?.resourceType ?: ComposeResourceType.STRING,
+    private val initialArrayItems: List<ComposeResourceItem> = emptyList(),
+    private val initialLocalizedItems: Map<ComposeResourceQualifier, List<ComposeResourceItem>> = emptyMap(),
 ) : DialogWrapper(project) {
 
     private val keyField = JBTextField(initialRow?.key ?: initialKey)
@@ -476,6 +554,42 @@ internal class AddStringDialog(
         MyBundle.message("translation.dialog.add.untranslatable"),
         !(initialRow?.translatable ?: true),
     )
+    private val stringTypeRadio = JRadioButton(
+        MyBundle.message("translation.dialog.type.string"),
+        initialType == ComposeResourceType.STRING,
+    )
+    private val arrayTypeRadio = JRadioButton(
+        MyBundle.message("translation.dialog.type.string-array"),
+        initialType == ComposeResourceType.STRING_ARRAY,
+    )
+    private val pluralsTypeRadio = JRadioButton(
+        MyBundle.message("translation.dialog.type.plurals"),
+        initialType == ComposeResourceType.PLURALS,
+    )
+    private val typeCards = JPanel(CardLayout())
+    private val arrayItemsPanel = ArrayItemsPanel()
+    private val arrayItemFields = mutableListOf<ArrayItemFields>()
+    private val arrayItems = buildInitialArrayItems()
+    private val pluralItemsPanel = ArrayItemsPanel()
+    private val pluralItemFields = mutableListOf<PluralItemFields>()
+    private val pluralItems = buildInitialPluralItems()
+
+    internal val typeRadioButtons: List<JRadioButton>
+        get() = listOf(stringTypeRadio, arrayTypeRadio, pluralsTypeRadio)
+
+    private data class ArrayItemFields(
+        var name: String,
+        val defaultField: JBTextField,
+        val localizedFields: Map<ComposeResourceQualifier, JBTextField>,
+        val removeButton: JButton,
+        val nameLabel: JBLabel,
+    )
+
+    private data class PluralItemFields(
+        val name: String,
+        val defaultField: JBTextField,
+        val localizedFields: Map<ComposeResourceQualifier, JBTextField>,
+    )
 
     init {
         title = if (initialRow == null) {
@@ -483,31 +597,271 @@ internal class AddStringDialog(
         } else {
             MyBundle.message("translation.dialog.edit.title")
         }
+        ButtonGroup().apply {
+            add(stringTypeRadio)
+            add(arrayTypeRadio)
+            add(pluralsTypeRadio)
+        }
+        stringTypeRadio.addActionListener { showTypeCard() }
+        arrayTypeRadio.addActionListener { showTypeCard() }
+        pluralsTypeRadio.addActionListener { showTypeCard() }
+        arrayItemsPanel.layout = javax.swing.BoxLayout(arrayItemsPanel, javax.swing.BoxLayout.Y_AXIS)
+        arrayItemsPanel.isOpaque = false
+        arrayItems.forEach(::addArrayItemRow)
+        pluralItemsPanel.layout = javax.swing.BoxLayout(pluralItemsPanel, javax.swing.BoxLayout.Y_AXIS)
+        pluralItemsPanel.isOpaque = false
+        pluralItems.forEach(::addPluralItemRow)
         init()
     }
 
-    fun draft(): StringResourceDraft = StringResourceDraft(
-        key = keyField.text.trim(),
-        defaultValue = defaultField.text,
-        localizedValues = localizedFields.mapValues { it.value.text },
-        translatable = !untranslatableCheck.isSelected,
-    )
-
-    override fun createCenterPanel(): JComponent = panel {
-        row(MyBundle.message("translation.dialog.add.key")) {
-            cell(keyField).align(AlignX.FILL).resizableColumn()
-            cell(untranslatableCheck)
+    fun draft(): StringResourceDraft {
+        val type = when {
+            arrayTypeRadio.isSelected -> ComposeResourceType.STRING_ARRAY
+            pluralsTypeRadio.isSelected -> ComposeResourceType.PLURALS
+            else -> ComposeResourceType.STRING
         }
+        val itemFields = when (type) {
+            ComposeResourceType.STRING_ARRAY -> arrayItemFields.map { fields ->
+                ComposeResourceItem(fields.name, fields.defaultField.text)
+            }
+            ComposeResourceType.PLURALS -> pluralItemFields.map { fields ->
+                ComposeResourceItem(fields.name, fields.defaultField.text)
+            }
+            ComposeResourceType.STRING -> emptyList()
+        }
+        return StringResourceDraft(
+            key = keyField.text.trim(),
+            defaultValue = if (type == ComposeResourceType.STRING) defaultField.text else "",
+            localizedValues = if (type == ComposeResourceType.STRING) {
+                localizedFields.mapValues { it.value.text }
+            } else {
+                emptyMap()
+            },
+            translatable = !untranslatableCheck.isSelected,
+            type = type,
+            defaultItems = itemFields,
+            localizedItems = when (type) {
+                ComposeResourceType.STRING -> emptyMap()
+                ComposeResourceType.STRING_ARRAY -> qualifiers.associateWith { qualifier ->
+                    arrayItemFields.map { field ->
+                        ComposeResourceItem(field.name, field.localizedFields.getValue(qualifier).text)
+                    }
+                }
+                ComposeResourceType.PLURALS -> qualifiers.associateWith { qualifier ->
+                    pluralItemFields.map { field ->
+                        ComposeResourceItem(field.name, field.localizedFields.getValue(qualifier).text)
+                    }
+                }
+            },
+        )
+    }
+
+    override fun createCenterPanel(): JComponent {
+        val typeSelector = JPanel(FlowLayout(FlowLayout.LEADING, 8, 0)).apply {
+            isOpaque = false
+            add(JBLabel(MyBundle.message("translation.dialog.type.label")))
+            add(stringTypeRadio)
+            add(arrayTypeRadio)
+            add(pluralsTypeRadio)
+        }
+        val commonFields = panel {
+            row(MyBundle.message("translation.dialog.add.key")) {
+                cell(keyField).align(AlignX.FILL).resizableColumn()
+                cell(untranslatableCheck)
+            }
+        }
+        typeCards.add(createStringFields(), "string")
+        typeCards.add(createArrayFields(), "string-array")
+        typeCards.add(createPluralFields(), "plurals")
+        showTypeCard()
+        return JPanel(BorderLayout(0, 8)).apply {
+            add(typeSelector, BorderLayout.NORTH)
+            add(JPanel(BorderLayout()).apply {
+                add(commonFields, BorderLayout.NORTH)
+                add(typeCards, BorderLayout.CENTER)
+            }, BorderLayout.CENTER)
+            preferredSize = JBUI.size(
+                680,
+                140 + qualifiers.size * 42 + maxOf(arrayItemFields.size, pluralItemFields.size) * 42,
+            )
+        }
+    }
+
+    private fun createStringFields(): JComponent = panel {
         row(MyBundle.message("translation.dialog.add.default")) {
-            cell(defaultField).align(AlignX.FILL)
+            cell(defaultField).align(AlignX.FILL).resizableColumn()
         }
         qualifiers.forEach { qualifier ->
             row(MyBundle.message("translation.dialog.add.locale", qualifier.displayName)) {
-                cell(localizedFields.getValue(qualifier)).align(AlignX.FILL)
+                cell(localizedFields.getValue(qualifier)).align(AlignX.FILL).resizableColumn()
             }
         }
-    }.apply {
-        preferredSize = JBUI.size(500, 100 + qualifiers.size * 34)
+    }
+
+    private fun createArrayFields(): JComponent = JPanel(BorderLayout(0, 4)).apply {
+        isOpaque = false
+        add(JBLabel(MyBundle.message("translation.dialog.array.items")), BorderLayout.NORTH)
+        add(JScrollPane(arrayItemsPanel).apply { border = null }, BorderLayout.CENTER)
+        add(JButton(MyBundle.message("translation.dialog.array.add-item")).apply {
+            addActionListener { addArrayItemRow(nextArrayItemName()) }
+        }, BorderLayout.SOUTH)
+    }
+
+    private fun createPluralFields(): JComponent = JPanel(BorderLayout(0, 4)).apply {
+        isOpaque = false
+        add(JBLabel(MyBundle.message("translation.dialog.plurals.items")), BorderLayout.NORTH)
+        add(JScrollPane(pluralItemsPanel).apply { border = null }, BorderLayout.CENTER)
+    }
+
+    private fun buildInitialArrayItems(): List<ComposeResourceItem> {
+        val names = buildList {
+            initialArrayItems.forEach { add(it.name) }
+            initialLocalizedItems.values.flatten().forEach { add(it.name) }
+        }.distinct()
+        return if (names.isEmpty()) listOf(ComposeResourceItem("0", "")) else names.map { name ->
+            initialArrayItems.firstOrNull { it.name == name } ?: ComposeResourceItem(name, "")
+        }
+    }
+
+    private fun buildInitialPluralItems(): List<ComposeResourceItem> = ComposePluralQuantities.all.map { name ->
+        initialArrayItems.firstOrNull { it.name == name }
+            ?: ComposeResourceItem(name, "")
+    }
+
+    private fun addArrayItemRow(item: ComposeResourceItem) = addArrayItemRow(item.name, item.value)
+
+    private fun addArrayItemRow(name: String) {
+        addArrayItemRow(name, "")
+    }
+
+    private fun addArrayItemRow(name: String, defaultValue: String) {
+        val defaultField = JBTextField(defaultValue).apply { columns = 16 }
+        val localized = qualifiers.associateWith { qualifier ->
+            JBTextField(initialLocalizedItems[qualifier].orEmpty().firstOrNull { it.name == name }?.value.orEmpty()).apply {
+                columns = 12
+            }
+        }
+        val nameLabel = JBLabel("[$name]")
+        val removeButton = JButton(MyBundle.message("translation.dialog.array.remove-item")).apply {
+            toolTipText = MyBundle.message("translation.dialog.array.remove-item")
+            addActionListener {
+                if (arrayItemFields.size > 1) {
+                    arrayItemFields.removeIf { it.removeButton === this }
+                    arrayItemsPanel.remove(parent)
+                    renumberArrayItems()
+                    arrayItemsPanel.revalidate()
+                    arrayItemsPanel.repaint()
+                }
+            }
+        }
+        val fields = ArrayItemFields(name, defaultField, localized, removeButton, nameLabel)
+        arrayItemFields += fields
+        arrayItemsPanel.add(JPanel(GridBagLayout()).apply {
+            isOpaque = false
+            alignmentX = Component.LEFT_ALIGNMENT
+            val labelConstraints = GridBagConstraints().apply {
+                gridx = 0
+                fill = GridBagConstraints.NONE
+                anchor = GridBagConstraints.LINE_START
+                insets = Insets(2, 4, 2, 4)
+            }
+            add(nameLabel, labelConstraints)
+            val fieldConstraints = GridBagConstraints().apply {
+                fill = GridBagConstraints.HORIZONTAL
+                weightx = 1.0
+                gridy = 0
+                insets = Insets(2, 4, 2, 4)
+            }
+            defaultField.minimumSize = Dimension(0, defaultField.preferredSize.height)
+            fieldConstraints.gridx = 1
+            add(defaultField, fieldConstraints)
+            localized.forEach { (qualifier, field) ->
+                field.toolTipText = qualifier.displayName
+                field.minimumSize = Dimension(0, field.preferredSize.height)
+                fieldConstraints.gridx += 1
+                add(field, fieldConstraints.clone() as GridBagConstraints)
+            }
+            val buttonConstraints = GridBagConstraints().apply {
+                gridx = fieldConstraints.gridx + 1
+                fill = GridBagConstraints.NONE
+                anchor = GridBagConstraints.LINE_END
+                insets = Insets(2, 4, 2, 4)
+            }
+            add(removeButton, buttonConstraints)
+            maximumSize = Dimension(Int.MAX_VALUE, preferredSize.height)
+        })
+        arrayItemsPanel.revalidate()
+    }
+
+    private fun addPluralItemRow(item: ComposeResourceItem) {
+        val defaultField = JBTextField(item.value).apply { columns = 16 }
+        val localized = qualifiers.associateWith { qualifier ->
+            JBTextField(initialLocalizedItems[qualifier].orEmpty().firstOrNull { it.name == item.name }?.value.orEmpty()).apply {
+                columns = 12
+            }
+        }
+        pluralItemFields += PluralItemFields(item.name, defaultField, localized)
+        pluralItemsPanel.add(JPanel(GridBagLayout()).apply {
+            isOpaque = false
+            alignmentX = Component.LEFT_ALIGNMENT
+            val labelConstraints = GridBagConstraints().apply {
+                gridx = 0
+                fill = GridBagConstraints.NONE
+                anchor = GridBagConstraints.LINE_START
+                insets = Insets(2, 4, 2, 4)
+            }
+            add(pluralQuantityLabel(item.name), labelConstraints)
+            val fieldConstraints = GridBagConstraints().apply {
+                fill = GridBagConstraints.HORIZONTAL
+                weightx = 1.0
+                gridy = 0
+                insets = Insets(2, 4, 2, 4)
+            }
+            defaultField.minimumSize = Dimension(0, defaultField.preferredSize.height)
+            fieldConstraints.gridx = 1
+            add(defaultField, fieldConstraints)
+            localized.forEach { (qualifier, field) ->
+                field.toolTipText = qualifier.displayName
+                field.minimumSize = Dimension(0, field.preferredSize.height)
+                fieldConstraints.gridx += 1
+                add(field, fieldConstraints.clone() as GridBagConstraints)
+            }
+            maximumSize = Dimension(Int.MAX_VALUE, preferredSize.height)
+        })
+        pluralItemsPanel.revalidate()
+    }
+
+    private fun pluralQuantityLabel(name: String): JBLabel {
+        val label = JBLabel("[$name]")
+        val width = ComposePluralQuantities.all.maxOf { quantity ->
+            JBLabel("[$quantity]").preferredSize.width
+        }
+        val fixedSize = Dimension(width, label.preferredSize.height)
+        label.minimumSize = fixedSize
+        label.preferredSize = fixedSize
+        label.maximumSize = fixedSize
+        return label
+    }
+
+    private fun renumberArrayItems() {
+        arrayItemFields.forEachIndexed { index, fields ->
+            fields.name = index.toString()
+            fields.nameLabel.text = "[$index]"
+        }
+    }
+
+    private fun nextArrayItemName(): String = generateSequence(0) { it + 1 }
+        .map(Int::toString)
+        .first { name -> arrayItemFields.none { it.name == name } }
+
+    private fun showTypeCard() {
+        val layout = typeCards.layout as CardLayout
+        val card = when {
+            arrayTypeRadio.isSelected -> "string-array"
+            pluralsTypeRadio.isSelected -> "plurals"
+            else -> "string"
+        }
+        layout.show(typeCards, card)
     }
 
     override fun doValidate(): ValidationInfo? = if (keyField.text.trim().isEmpty()) {
@@ -521,19 +875,24 @@ internal class TranslationToolbar(
     onAddString: () -> Unit,
     onDeleteSelected: () -> Unit,
     onRefresh: () -> Unit,
-) : JPanel(WrapLayout(FlowLayout.LEADING, 4, 0)) {
+    displayLanguage: JComponent,
+) : JPanel(BorderLayout(8, 0)) {
+
+    private val actions = JPanel(WrapLayout(FlowLayout.LEADING, 4, 0)).apply {
+        isOpaque = false
+    }
 
     init {
         isOpaque = false
         border = JBUI.Borders.empty(2, 0)
-        add(
+        actions.add(
             toolbarButton(
                 icon = AllIcons.General.Add,
                 tooltip = MyBundle.message("translation.toolbar.add"),
                 onClick = onAddString,
             ),
         )
-        add(
+        actions.add(
             toolbarButton(
                 icon = IconUtil.colorize(
                     AllIcons.General.Delete,
@@ -544,14 +903,14 @@ internal class TranslationToolbar(
                 onClick = onDeleteSelected,
             ),
         )
-        add(
+        actions.add(
             toolbarButton(
                 icon = AllIcons.Actions.Refresh,
                 tooltip = MyBundle.message("translation.toolbar.refresh"),
                 onClick = onRefresh,
             ),
         )
-        add(
+        actions.add(
             toolbarButton(
                 icon = AllIcons.General.Export,
                 tooltip = MyBundle.message("translation.toolbar.export"),
@@ -559,6 +918,21 @@ internal class TranslationToolbar(
                 onClick = {},
             ),
         )
+        add(actions, BorderLayout.CENTER)
+
+        add(
+            JPanel(FlowLayout(FlowLayout.TRAILING, 4, 0)).apply {
+                isOpaque = false
+                add(JBLabel(MyBundle.message("translation.display-language.label")))
+                add(displayLanguage)
+            },
+            BorderLayout.EAST,
+        )
+    }
+
+    override fun doLayout() {
+        super.doLayout()
+        actions.doLayout()
     }
 }
 
@@ -740,6 +1114,23 @@ internal class ResourceSetOptionRenderer : JPanel(BorderLayout(6, 2)),
         foreground = if (isSelected) list.selectionForeground else list.foreground
         resourceSetLabel.foreground = foreground
         return this
+    }
+}
+
+internal class TranslationLanguageRenderer : ListCellRenderer<ComposeResourceQualifier> {
+
+    private val delegate = DefaultListCellRenderer()
+
+    override fun getListCellRendererComponent(
+        list: JList<out ComposeResourceQualifier>,
+        value: ComposeResourceQualifier?,
+        index: Int,
+        isSelected: Boolean,
+        cellHasFocus: Boolean,
+    ): Component {
+        delegate.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus)
+        delegate.text = value?.displayName.orEmpty()
+        return delegate
     }
 }
 
@@ -1043,6 +1434,82 @@ private class TranslationCellRenderer : DefaultTableCellRenderer() {
             component.foreground = if (isSelected) table.selectionForeground else table.foreground
         }
         
+        component.font = table.font
+        return component
+    }
+}
+
+private class TranslationBooleanCellRenderer(
+    private val delegate: javax.swing.table.TableCellRenderer,
+) : javax.swing.table.TableCellRenderer {
+
+    override fun getTableCellRendererComponent(
+        table: JTable,
+        value: Any?,
+        isSelected: Boolean,
+        hasFocus: Boolean,
+        row: Int,
+        column: Int,
+    ): Component {
+        val model = table.model as? ComposeTranslationTableModel
+        val translationRow = model?.visibleRows()?.getOrNull(table.convertRowIndexToModel(row))
+        if (translationRow?.isChild == true) {
+            return JPanel().apply {
+                isOpaque = true
+                background = if (isSelected) table.selectionBackground else table.background
+            }
+        }
+        return delegate.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column)
+    }
+}
+
+private class TranslationTable(model: ComposeTranslationTableModel) : JBTable(model) {
+
+    override fun editCellAt(row: Int, column: Int, event: EventObject?): Boolean {
+        if (column == 0 && isExpansionToggleHit(row, event)) return false
+        return super.editCellAt(row, column, event)
+    }
+
+    fun isExpansionToggleHit(row: Int, event: EventObject?): Boolean {
+        val mouseEvent = event as? MouseEvent ?: return false
+        if (mouseEvent.button != MouseEvent.BUTTON1) return false
+        val translationModel = model as? ComposeTranslationTableModel ?: return false
+        val modelRow = convertRowIndexToModel(row)
+        val translationRow = translationModel.visibleRows().getOrNull(modelRow) ?: return false
+        if (!translationRow.hasChildren) return false
+        val cellBounds = getCellRect(row, 0, false)
+        return mouseEvent.x - cellBounds.x in 0..(28 + translationRow.depth * 16)
+    }
+}
+
+private class TranslationKeyCellRenderer : DefaultTableCellRenderer() {
+
+    override fun getTableCellRendererComponent(
+        table: JTable,
+        value: Any?,
+        isSelected: Boolean,
+        hasFocus: Boolean,
+        row: Int,
+        column: Int,
+    ): Component {
+        val component = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column)
+        val model = table.model as? ComposeTranslationTableModel
+        val translationRow = model?.visibleRows()?.getOrNull(table.convertRowIndexToModel(row))
+        if (translationRow != null) {
+            val marker = when {
+                translationRow.hasChildren && model.isExpanded(translationRow.key) -> "▾ "
+                translationRow.hasChildren -> "▸ "
+                translationRow.isChild -> "└ "
+                else -> "  "
+            }
+            text = marker + if (translationRow.isChild) {
+                translationRow.itemName.orEmpty()
+            } else {
+                translationRow.key
+            }
+            border = JBUI.Borders.empty(0, translationRow.depth * 16 + 4, 0, 4)
+        }
+        if (!isSelected) component.background = table.background
         component.font = table.font
         return component
     }
