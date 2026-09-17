@@ -41,6 +41,7 @@ import java.awt.event.ComponentAdapter
 import java.awt.event.ComponentEvent
 import java.awt.event.MouseAdapter
 import java.awt.event.MouseEvent
+import java.util.EventObject
 import javax.swing.*
 import javax.swing.event.DocumentEvent
 import javax.swing.table.DefaultTableCellRenderer
@@ -57,7 +58,7 @@ internal data class ResourceSetOption(val resourceSet: ComposeResourceSet) {
 class ComposeTranslationToolWindow(private val project: Project) {
 
     private val tableModel = ComposeTranslationTableModel()
-    private val table = JBTable(tableModel)
+    private val table = TranslationTable(tableModel)
     private val searchField = EllipsisTextField()
     private val filterButton = TranslationFilterButton { filter ->
         tableModel.filter = filter
@@ -90,20 +91,16 @@ class ComposeTranslationToolWindow(private val project: Project) {
         tableModel.onTranslatableEdited = ::editTranslatable
         table.addMouseListener(object : MouseAdapter() {
             override fun mouseClicked(event: MouseEvent) {
-                if (event.clickCount == 1 && event.button == MouseEvent.BUTTON1 && table.columnAtPoint(event.point) == 0) {
-                    val row = table.rowAtPoint(event.point)
-                    val modelRow = row.takeIf { it >= 0 }?.let(table::convertRowIndexToModel)
-                    val translationRow = modelRow?.let { tableModel.visibleRows().getOrNull(it) }
-                    val cellBounds = row.takeIf { it >= 0 }?.let { table.getCellRect(it, 0, false) }
-                    val clickedToggle = translationRow?.hasChildren == true &&
-                        cellBounds != null && event.x - cellBounds.x <= 28 + translationRow.depth * 16
-                    if (clickedToggle && tableModel.toggleExpanded(modelRow)) {
-                        if (table.isEditing) table.cellEditor?.cancelCellEditing()
-                        return
+                val row = table.rowAtPoint(event.point)
+                val modelRow = row.takeIf { it >= 0 }?.let(table::convertRowIndexToModel)
+                if (row >= 0 && table.isExpansionToggleHit(row, event)) {
+                    if (event.clickCount == 1 && modelRow != null) {
+                        tableModel.toggleExpanded(modelRow)
                     }
+                    if (table.isEditing) table.cellEditor?.cancelCellEditing()
+                    return
                 }
                 if (event.clickCount == 2 && event.button == MouseEvent.BUTTON1) {
-                    val row = table.rowAtPoint(event.point)
                     if (row >= 0) {
                         editRowInDialog(row)
                     }
@@ -513,6 +510,20 @@ class ComposeTranslationToolWindow(private val project: Project) {
 
 internal typealias StringResourceDraft = ComposeResourceDraft
 
+private class ArrayItemsPanel : JPanel(), Scrollable {
+
+    override fun getPreferredScrollableViewportSize(): Dimension = preferredSize
+
+    override fun getScrollableUnitIncrement(visibleRect: Rectangle, orientation: Int, direction: Int): Int = 24
+
+    override fun getScrollableBlockIncrement(visibleRect: Rectangle, orientation: Int, direction: Int): Int =
+        visibleRect.height.coerceAtLeast(24)
+
+    override fun getScrollableTracksViewportWidth(): Boolean = true
+
+    override fun getScrollableTracksViewportHeight(): Boolean = false
+}
+
 internal class AddStringDialog(
     project: Project,
     private val qualifiers: List<ComposeResourceQualifier>,
@@ -546,7 +557,7 @@ internal class AddStringDialog(
         false,
     ).apply { isEnabled = false }
     private val typeCards = JPanel(CardLayout())
-    private val arrayItemsPanel = JPanel()
+    private val arrayItemsPanel = ArrayItemsPanel()
     private val arrayItemFields = mutableListOf<ArrayItemFields>()
     private val arrayItems = buildInitialArrayItems()
 
@@ -554,10 +565,11 @@ internal class AddStringDialog(
         get() = listOf(stringTypeRadio, arrayTypeRadio, pluralsTypeRadio)
 
     private data class ArrayItemFields(
-        val name: String,
+        var name: String,
         val defaultField: JBTextField,
         val localizedFields: Map<ComposeResourceQualifier, JBTextField>,
         val removeButton: JButton,
+        val nameLabel: JBLabel,
     )
 
     init {
@@ -671,33 +683,66 @@ internal class AddStringDialog(
                 columns = 12
             }
         }
-        val removeButton = JButton("−").apply {
+        val nameLabel = JBLabel("[$name]")
+        val removeButton = JButton(MyBundle.message("translation.dialog.array.remove-item")).apply {
             toolTipText = MyBundle.message("translation.dialog.array.remove-item")
             addActionListener {
                 if (arrayItemFields.size > 1) {
                     arrayItemFields.removeIf { it.removeButton === this }
                     arrayItemsPanel.remove(parent)
+                    renumberArrayItems()
                     arrayItemsPanel.revalidate()
                     arrayItemsPanel.repaint()
                 }
             }
         }
-        val fields = ArrayItemFields(name, defaultField, localized, removeButton)
+        val fields = ArrayItemFields(name, defaultField, localized, removeButton, nameLabel)
         arrayItemFields += fields
-        arrayItemsPanel.add(JPanel(FlowLayout(FlowLayout.LEADING, 4, 2)).apply {
+        arrayItemsPanel.add(JPanel(GridBagLayout()).apply {
             isOpaque = false
-            add(JBLabel("[$name]"))
-            add(defaultField)
+            alignmentX = Component.LEFT_ALIGNMENT
+            val labelConstraints = GridBagConstraints().apply {
+                gridx = 0
+                fill = GridBagConstraints.NONE
+                anchor = GridBagConstraints.LINE_START
+                insets = Insets(2, 4, 2, 4)
+            }
+            add(nameLabel, labelConstraints)
+            val fieldConstraints = GridBagConstraints().apply {
+                fill = GridBagConstraints.HORIZONTAL
+                weightx = 1.0
+                gridy = 0
+                insets = Insets(2, 4, 2, 4)
+            }
+            defaultField.minimumSize = Dimension(0, defaultField.preferredSize.height)
+            fieldConstraints.gridx = 1
+            add(defaultField, fieldConstraints)
             localized.forEach { (qualifier, field) ->
                 field.toolTipText = qualifier.displayName
-                add(field)
+                field.minimumSize = Dimension(0, field.preferredSize.height)
+                fieldConstraints.gridx += 1
+                add(field, fieldConstraints.clone() as GridBagConstraints)
             }
-            add(removeButton)
+            val buttonConstraints = GridBagConstraints().apply {
+                gridx = fieldConstraints.gridx + 1
+                fill = GridBagConstraints.NONE
+                anchor = GridBagConstraints.LINE_END
+                insets = Insets(2, 4, 2, 4)
+            }
+            add(removeButton, buttonConstraints)
+            maximumSize = Dimension(Int.MAX_VALUE, preferredSize.height)
         })
         arrayItemsPanel.revalidate()
     }
 
-    private fun nextArrayItemName(): String = generateSequence(arrayItemFields.size) { it + 1 }
+    private fun renumberArrayItems() {
+        arrayItemFields.forEachIndexed { index, fields ->
+            fields.name = index.toString()
+            fields.nameLabel.text = "[$index]"
+        }
+    }
+
+    private fun nextArrayItemName(): String = generateSequence(0) { it + 1 }
         .map(Int::toString)
         .first { name -> arrayItemFields.none { it.name == name } }
 
@@ -1278,6 +1323,25 @@ private class TranslationCellRenderer : DefaultTableCellRenderer() {
         
         component.font = table.font
         return component
+    }
+}
+
+private class TranslationTable(model: ComposeTranslationTableModel) : JBTable(model) {
+
+    override fun editCellAt(row: Int, column: Int, event: EventObject?): Boolean {
+        if (column == 0 && isExpansionToggleHit(row, event)) return false
+        return super.editCellAt(row, column, event)
+    }
+
+    fun isExpansionToggleHit(row: Int, event: EventObject?): Boolean {
+        val mouseEvent = event as? MouseEvent ?: return false
+        if (mouseEvent.button != MouseEvent.BUTTON1) return false
+        val translationModel = model as? ComposeTranslationTableModel ?: return false
+        val modelRow = convertRowIndexToModel(row)
+        val translationRow = translationModel.visibleRows().getOrNull(modelRow) ?: return false
+        if (!translationRow.hasChildren) return false
+        val cellBounds = getCellRect(row, 0, false)
+        return mouseEvent.x - cellBounds.x in 0..(28 + translationRow.depth * 16)
     }
 }
 

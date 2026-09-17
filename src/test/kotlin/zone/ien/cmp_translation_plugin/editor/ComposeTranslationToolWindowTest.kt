@@ -20,6 +20,8 @@ import javax.swing.JPanel
 import javax.swing.JTable
 import javax.swing.JTextField
 import javax.swing.SwingUtilities
+import java.awt.Container
+import java.awt.event.MouseEvent
 import java.util.concurrent.atomic.AtomicReference
 import zone.ien.cmp_translation_plugin.MyBundle
 import zone.ien.cmp_translation_plugin.resource.ComposeResourceQualifier
@@ -382,6 +384,107 @@ class ComposeTranslationToolWindowTest : BasePlatformTestCase() {
         assertEquals(listOf("0"), dialog.draft().defaultItems.map(ComposeResourceItem::name))
     }
 
+    fun testStringArrayItemsAreRenumberedAfterDeleteAndAdd() {
+        val dialog = AddStringDialog(
+            project = project,
+            qualifiers = emptyList(),
+            initialType = ComposeResourceType.STRING_ARRAY,
+            initialArrayItems = listOf(
+                ComposeResourceItem("0", "Zero"),
+                ComposeResourceItem("1", "One"),
+                ComposeResourceItem("2", "Two"),
+                ComposeResourceItem("3", "Three"),
+            ),
+        )
+
+        val content = dialogContent(dialog)
+        val removeButtons = arrayRemoveButtons(content)
+        assertEquals(4, removeButtons.size)
+        assertEquals(MyBundle.message("translation.dialog.array.remove-item"), removeButtons.first().text)
+
+        removeButtons[1].doClick()
+        assertEquals(listOf("0", "1", "2"), dialog.draft().defaultItems.map(ComposeResourceItem::name))
+
+        arrayRemoveButtons(content).first().doClick()
+        assertEquals(listOf("0", "1"), dialog.draft().defaultItems.map(ComposeResourceItem::name))
+
+        descendants(content)
+            .filterIsInstance<JButton>()
+            .first { it.text == MyBundle.message("translation.dialog.array.add-item") }
+            .doClick()
+        assertEquals(listOf("0", "1", "2"), dialog.draft().defaultItems.map(ComposeResourceItem::name))
+    }
+
+    fun testStringArrayRowsStayPackedAndTextFieldsFillAvailableWidth() {
+        val dialog = AddStringDialog(
+            project = project,
+            qualifiers = emptyList(),
+            initialType = ComposeResourceType.STRING_ARRAY,
+            initialArrayItems = listOf(
+                ComposeResourceItem("0", "Zero"),
+                ComposeResourceItem("1", "One"),
+            ),
+        )
+        val content = arrayItemsPanel(dialog)
+        content.setSize(900, 600)
+        layoutRecursively(content)
+
+        val rows = arrayRows(dialog)
+        assertEquals(2, rows.size)
+        assertEquals(rows[0].y + rows[0].height, rows[1].y)
+        rows.forEach { row ->
+            val field = descendants(row).filterIsInstance<JBTextField>().single()
+            assertTrue(field.width > 500)
+        }
+    }
+
+    fun testStringArrayRowsStayPackedWhenDialogCardGrows() {
+        val dialog = AddStringDialog(
+            project = project,
+            qualifiers = emptyList(),
+            initialType = ComposeResourceType.STRING_ARRAY,
+            initialArrayItems = listOf(
+                ComposeResourceItem("0", "Zero"),
+                ComposeResourceItem("1", "One"),
+            ),
+        )
+        val content = dialogContent(dialog)
+        content.setSize(900, 900)
+        layoutRecursively(content)
+
+        val scrollPane = descendants(content).filterIsInstance<javax.swing.JScrollPane>().last()
+        scrollPane.setSize(860, 700)
+        layoutRecursively(scrollPane)
+
+        val rows = arrayRows(dialog)
+        assertEquals(2, rows.size)
+        assertEquals(rows[0].y + rows[0].height, rows[1].y)
+    }
+
+    fun testArrayExpandArrowDoesNotStartKeyEditing() {
+        myFixture.tempDirFixture.createFile(
+            "src/commonMain/composeResources/values/strings.xml",
+            "<resources><string-array name=\"menu\"><item>Home</item><item>Settings</item></string-array></resources>",
+        )
+
+        val content = ComposeTranslationToolWindow(project).component
+        val table = descendants(content).filterIsInstance<JTable>().single()
+        val cell = table.getCellRect(0, 0, false)
+        val event = MouseEvent(
+            table,
+            MouseEvent.MOUSE_PRESSED,
+            System.currentTimeMillis(),
+            0,
+            cell.x + 8,
+            cell.y + 8,
+            1,
+            false,
+            MouseEvent.BUTTON1,
+        )
+
+        assertFalse(table.editCellAt(0, 0, event))
+    }
+
     fun testToolWindowDisplaysExpandedStringArrayRowsWithIndentedKeys() {
         myFixture.tempDirFixture.createFile(
             "src/commonMain/composeResources/values/strings.xml",
@@ -490,6 +593,29 @@ class ComposeTranslationToolWindowTest : BasePlatformTestCase() {
         descendants(content).filterIsInstance<JComboBox<*>>().single { combo ->
             combo.getItemAt(0) is ResourceSetOption
         }
+
+    private fun arrayRemoveButtons(content: Component): List<JButton> =
+        descendants(content)
+            .filterIsInstance<JButton>()
+            .filter { it.text == MyBundle.message("translation.dialog.array.remove-item") }
+
+    private fun arrayRows(dialog: AddStringDialog): List<Container> =
+        descendants(arrayItemsPanel(dialog))
+            .filterIsInstance<Container>()
+            .filter { container ->
+                container.components.any { component ->
+                    component is JLabel && component.text.matches(Regex("\\[\\d+\\]"))
+                }
+            }
+            .sortedBy { it.y }
+
+    private fun arrayItemsPanel(dialog: AddStringDialog): JPanel =
+        AddStringDialog::class.java.getDeclaredField("arrayItemsPanel").apply { isAccessible = true }
+            .get(dialog) as JPanel
+
+    private fun dialogContent(dialog: AddStringDialog): Component =
+        AddStringDialog::class.java.getDeclaredMethod("createCenterPanel").apply { isAccessible = true }
+            .invoke(dialog) as Component
 
     private fun layoutRecursively(component: Component) {
         if (component !is java.awt.Container) return
