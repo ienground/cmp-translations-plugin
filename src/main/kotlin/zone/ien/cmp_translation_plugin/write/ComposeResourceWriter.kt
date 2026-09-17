@@ -9,6 +9,7 @@ import com.intellij.psi.xml.XmlTag
 import zone.ien.cmp_translation_plugin.resource.ComposeResourceDocument
 import zone.ien.cmp_translation_plugin.resource.ComposeResourceDraft
 import zone.ien.cmp_translation_plugin.resource.ComposeResourceItem
+import zone.ien.cmp_translation_plugin.resource.ComposePluralQuantities
 import zone.ien.cmp_translation_plugin.resource.ComposeResourceQualifier
 import zone.ien.cmp_translation_plugin.resource.ComposeResourceSet
 import zone.ien.cmp_translation_plugin.resource.ComposeResourceType
@@ -190,11 +191,31 @@ class ComposeResourceWriter(private val project: Project) {
         value: String,
     ): Boolean = runWriteCommand {
         val file = findXmlFile(document) ?: return@runWriteCommand false
-        val tag = findResourceTag(file, key)?.takeIf { it.name == "string-array" } ?: return@runWriteCommand false
-        val item = tag.findSubTags("item").getOrNull(itemName.toIntOrNull() ?: return@runWriteCommand false)
-            ?: return@runWriteCommand false
-        item.value.text = value
-        true
+        val tag = findResourceTag(file, key) ?: return@runWriteCommand false
+        when (tag.name) {
+            "string-array" -> {
+                val item = tag.findSubTags("item").getOrNull(itemName.toIntOrNull() ?: return@runWriteCommand false)
+                    ?: return@runWriteCommand false
+                item.value.text = value
+                true
+            }
+            "plurals" -> {
+                val item = tag.findSubTags("item").firstOrNull {
+                    it.getAttributeValue("quantity") == itemName
+                }
+                if (value.isBlank()) {
+                    item?.delete()
+                    item != null
+                } else if (item != null) {
+                    item.value.text = value
+                    true
+                } else {
+                    addPluralItem(tag, ComposeResourceItem(itemName, value))
+                    true
+                }
+            }
+            else -> false
+        }
     }
 
     fun setTranslatable(document: ComposeResourceDocument, key: String, translatable: Boolean): Boolean =
@@ -217,7 +238,7 @@ class ComposeResourceWriter(private val project: Project) {
         return when (draft.type) {
             ComposeResourceType.STRING -> addStringTag(file, draft.key, draft.defaultValue, draft.translatable)
             ComposeResourceType.STRING_ARRAY -> addArrayTag(file, draft.key, draft.defaultItems, draft.translatable)
-            ComposeResourceType.PLURALS -> false
+            ComposeResourceType.PLURALS -> addPluralTag(file, draft.key, draft.defaultItems, draft.translatable)
         }
     }
 
@@ -232,7 +253,7 @@ class ComposeResourceWriter(private val project: Project) {
         when (draft.type) {
             ComposeResourceType.STRING -> tag.value.text = draft.defaultValue
             ComposeResourceType.STRING_ARRAY -> updateArrayItems(tag, draft.defaultItems)
-            ComposeResourceType.PLURALS -> return false
+            ComposeResourceType.PLURALS -> updatePluralItems(tag, draft.defaultItems)
         }
         return true
     }
@@ -279,6 +300,35 @@ class ComposeResourceWriter(private val project: Project) {
                 tag.addSubTag(itemTag, false)
             }
         }
+    }
+
+    private fun addPluralTag(
+        file: XmlFile,
+        key: String,
+        items: List<ComposeResourceItem>,
+        translatable: Boolean = true,
+    ): Boolean {
+        val rootTag = file.rootTag ?: return false
+        val pluralsTag = XmlElementFactory.getInstance(project).createTagFromText("<plurals name=\"resource\" />")
+        pluralsTag.setAttribute("name", key)
+        pluralsTag.setAttribute("translatable", if (translatable) null else "false")
+        ComposePluralQuantities.sort(items.filter { it.value.isNotBlank() })
+            .forEach { item -> addPluralItem(pluralsTag, item) }
+        rootTag.addSubTag(pluralsTag, false)
+        return true
+    }
+
+    private fun updatePluralItems(tag: XmlTag, items: List<ComposeResourceItem>) {
+        tag.findSubTags("item").forEach(XmlTag::delete)
+        ComposePluralQuantities.sort(items.filter { it.value.isNotBlank() })
+            .forEach { item -> addPluralItem(tag, item) }
+    }
+
+    private fun addPluralItem(tag: XmlTag, item: ComposeResourceItem) {
+        val itemTag = XmlElementFactory.getInstance(project).createTagFromText("<item />")
+        itemTag.setAttribute("quantity", item.name)
+        itemTag.value.text = item.value
+        tag.addSubTag(itemTag, false)
     }
 
     private fun <T> runWriteCommand(action: () -> T): T {

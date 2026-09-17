@@ -226,6 +226,75 @@ class ComposeResourceWriterTest : BasePlatformTestCase() {
         assertEquals(emptyList<String>(), findArrayItems(resourceSet.documentFor(ComposeResourceQualifier("ko"))!!.descriptor.file, "menu"))
     }
 
+    fun testAddsPluralItemsInQuantityOrderWithoutBlankItems() {
+        createFile("src/commonMain/composeResources/values/strings.xml", "<resources />")
+        createFile("src/commonMain/composeResources/values-ko/strings.xml", "<resources />")
+        val resourceSet = loadSet()
+
+        assertEquals(
+            true,
+            ComposeResourceWriter(project).addResource(
+                resourceSet,
+                StringResourceDraft(
+                    key = "inbox_count",
+                    defaultValue = "",
+                    localizedValues = emptyMap(),
+                    translatable = true,
+                    type = ComposeResourceType.PLURALS,
+                    defaultItems = listOf(
+                        ComposeResourceItem("other", "%d messages"),
+                        ComposeResourceItem("zero", ""),
+                        ComposeResourceItem("one", "%d message"),
+                    ),
+                    localizedItems = mapOf(
+                        ComposeResourceQualifier("ko") to listOf(
+                            ComposeResourceItem("other", "%d개 메시지"),
+                            ComposeResourceItem("one", "%d개 메시지"),
+                            ComposeResourceItem("two", ""),
+                        ),
+                    ),
+                ),
+            ),
+        )
+        commitPsi()
+
+        assertEquals(
+            listOf("one:%d message", "other:%d messages"),
+            findPluralItems(resourceSet.defaultDocument!!.descriptor.file, "inbox_count"),
+        )
+        assertEquals(
+            listOf("one:%d개 메시지", "other:%d개 메시지"),
+            findPluralItems(resourceSet.documentFor(ComposeResourceQualifier("ko"))!!.descriptor.file, "inbox_count"),
+        )
+    }
+
+    fun testClearingPluralItemRemovesItFromXml() {
+        createFile(
+            "src/commonMain/composeResources/values/strings.xml",
+            "<resources><plurals name=\"inbox_count\"><item quantity=\"one\">%d message</item><item quantity=\"other\">%d messages</item></plurals></resources>",
+        )
+        val resourceSet = loadSet()
+
+        ComposeResourceWriter(project).updateResource(
+            resourceSet,
+            oldKey = "inbox_count",
+            draft = StringResourceDraft(
+                key = "inbox_count",
+                defaultValue = "",
+                localizedValues = emptyMap(),
+                translatable = true,
+                type = ComposeResourceType.PLURALS,
+                defaultItems = listOf(
+                    ComposeResourceItem("one", ""),
+                    ComposeResourceItem("other", "%d messages"),
+                ),
+            ),
+        )
+        commitPsi()
+
+        assertEquals(listOf("other:%d messages"), findPluralItems(resourceSet.defaultDocument!!.descriptor.file, "inbox_count"))
+    }
+
     private fun loadSet(): ComposeResourceSet = ComposeResourceCatalog(project).load().single()
 
     private fun createFile(path: String, text: String): VirtualFile =
@@ -249,6 +318,15 @@ class ComposeResourceWriterTest : BasePlatformTestCase() {
             ?.firstOrNull { it.getAttributeValue("name") == key }
             ?.findSubTags("item")
             ?.map { it.value.text }
+            .orEmpty()
+    }
+
+    private fun findPluralItems(file: VirtualFile, key: String): List<String> {
+        val xmlFile = PsiManager.getInstance(project).findFile(file) as? XmlFile ?: return emptyList()
+        return xmlFile.rootTag?.findSubTags("plurals")
+            ?.firstOrNull { it.getAttributeValue("name") == key }
+            ?.findSubTags("item")
+            ?.map { "${it.getAttributeValue("quantity")}:${it.value.text}" }
             .orEmpty()
     }
 }

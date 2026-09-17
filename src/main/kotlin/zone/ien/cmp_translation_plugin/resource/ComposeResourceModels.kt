@@ -7,6 +7,17 @@ enum class ComposeResourceType {
     PLURALS,
 }
 
+/** 번역 편집기에서 지원하는 Android 복수형 수량 키입니다. */
+object ComposePluralQuantities {
+
+    val all: List<String> = listOf("zero", "one", "two", "few", "many", "other")
+
+    fun sort(items: Iterable<ComposeResourceItem>): List<ComposeResourceItem> = items.sortedWith(
+        compareBy<ComposeResourceItem> { all.indexOf(it.name).takeIf { index -> index >= 0 } ?: all.size }
+            .thenBy(ComposeResourceItem::name),
+    )
+}
+
 /** One named child value of a multi-value Android resource. */
 data class ComposeResourceItem(
     val name: String,

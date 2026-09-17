@@ -145,6 +145,30 @@ class ComposeTranslationTableModelTest {
     }
 
     @Test
+    fun hidesBlankPluralItemsFromTheTranslationRows() {
+        val model = ComposeTranslationTableModel()
+        model.setEntries(
+            defaultEntries = listOf(
+                ComposeStringEntry(
+                    key = "inbox_count",
+                    value = "",
+                    type = ComposeResourceType.PLURALS,
+                    items = listOf(
+                        ComposeResourceItem("zero", ""),
+                        ComposeResourceItem("one", "%d message"),
+                        ComposeResourceItem("other", "%d messages"),
+                    ),
+                ),
+            ),
+            localizedEntries = emptyMap(),
+            issues = emptyList(),
+        )
+
+        assertEquals(3, model.rowCount)
+        assertEquals(listOf("inbox_count", "└ one", "└ other"), (0 until model.rowCount).map { model.getValueAt(it, 0) })
+    }
+
+    @Test
     fun forwardsArrayItemEditsWithParentKeyAndItemName() {
         val model = ComposeTranslationTableModel()
         var edited: Quadruple<String, String, ComposeResourceQualifier?, String>? = null

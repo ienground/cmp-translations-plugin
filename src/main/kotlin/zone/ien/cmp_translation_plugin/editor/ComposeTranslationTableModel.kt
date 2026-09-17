@@ -2,6 +2,7 @@ package zone.ien.cmp_translation_plugin.editor
 
 import zone.ien.cmp_translation_plugin.MyBundle
 import zone.ien.cmp_translation_plugin.resource.ComposeResourceQualifier
+import zone.ien.cmp_translation_plugin.resource.ComposePluralQuantities
 import zone.ien.cmp_translation_plugin.resource.ComposeResourceType
 import zone.ien.cmp_translation_plugin.resource.ComposeStringEntry
 import zone.ien.cmp_translation_plugin.validation.ComposeResourceIssue
@@ -178,9 +179,19 @@ class ComposeTranslationTableModel : AbstractTableModel() {
                 ?: ComposeResourceType.STRING
             val parentIssues = issuesByKey[key].orEmpty().filter { it.itemName == null }
             val itemNames = buildList {
-                defaultEntry?.items?.forEach { add(it.name) }
-                localeEntries.values.filterNotNull().flatMap { it.items }.forEach { add(it.name) }
-            }.distinct()
+                defaultEntry?.items
+                    ?.filter { type != ComposeResourceType.PLURALS || it.value.isNotBlank() }
+                    ?.forEach { add(it.name) }
+                localeEntries.values.filterNotNull().flatMap { it.items }
+                    .filter { type != ComposeResourceType.PLURALS || it.value.isNotBlank() }
+                    .forEach { add(it.name) }
+            }.distinct().let { names ->
+                if (type == ComposeResourceType.PLURALS) {
+                    names.sortedWith(compareBy { ComposePluralQuantities.all.indexOf(it).takeIf { index -> index >= 0 } ?: ComposePluralQuantities.all.size })
+                } else {
+                    names
+                }
+            }
             val children = if (type == ComposeResourceType.STRING) {
                 emptyList()
             } else {

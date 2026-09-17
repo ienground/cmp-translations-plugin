@@ -499,7 +499,13 @@ class ComposeTranslationToolWindow(private val project: Project) {
                     ?.let { tag ->
                         if (row.isChild) {
                             tag.findSubTags("item")
-                                .getOrNull(row.itemName?.toIntOrNull() ?: -1)
+                                .let { items ->
+                                    if (row.resourceType == ComposeResourceType.PLURALS) {
+                                        items.firstOrNull { it.getAttributeValue("quantity") == row.itemName }
+                                    } else {
+                                        items.getOrNull(row.itemName?.toIntOrNull() ?: -1)
+                                    }
+                                }
                                 ?.textRange
                                 ?.startOffset
                         } else {
@@ -558,12 +564,15 @@ internal class AddStringDialog(
     )
     private val pluralsTypeRadio = JRadioButton(
         MyBundle.message("translation.dialog.type.plurals"),
-        false,
-    ).apply { isEnabled = false }
+        initialType == ComposeResourceType.PLURALS,
+    )
     private val typeCards = JPanel(CardLayout())
     private val arrayItemsPanel = ArrayItemsPanel()
     private val arrayItemFields = mutableListOf<ArrayItemFields>()
     private val arrayItems = buildInitialArrayItems()
+    private val pluralItemsPanel = ArrayItemsPanel()
+    private val pluralItemFields = mutableListOf<PluralItemFields>()
+    private val pluralItems = buildInitialPluralItems()
 
     internal val typeRadioButtons: List<JRadioButton>
         get() = listOf(stringTypeRadio, arrayTypeRadio, pluralsTypeRadio)
@@ -574,6 +583,12 @@ internal class AddStringDialog(
         val localizedFields: Map<ComposeResourceQualifier, JBTextField>,
         val removeButton: JButton,
         val nameLabel: JBLabel,
+    )
+
+    private data class PluralItemFields(
+        val name: String,
+        val defaultField: JBTextField,
+        val localizedFields: Map<ComposeResourceQualifier, JBTextField>,
     )
 
     init {
@@ -589,33 +604,57 @@ internal class AddStringDialog(
         }
         stringTypeRadio.addActionListener { showTypeCard() }
         arrayTypeRadio.addActionListener { showTypeCard() }
+        pluralsTypeRadio.addActionListener { showTypeCard() }
         arrayItemsPanel.layout = javax.swing.BoxLayout(arrayItemsPanel, javax.swing.BoxLayout.Y_AXIS)
         arrayItemsPanel.isOpaque = false
         arrayItems.forEach(::addArrayItemRow)
+        pluralItemsPanel.layout = javax.swing.BoxLayout(pluralItemsPanel, javax.swing.BoxLayout.Y_AXIS)
+        pluralItemsPanel.isOpaque = false
+        pluralItems.forEach(::addPluralItemRow)
         init()
     }
 
-    fun draft(): StringResourceDraft = StringResourceDraft(
-        key = keyField.text.trim(),
-        defaultValue = if (arrayTypeRadio.isSelected) "" else defaultField.text,
-        localizedValues = if (arrayTypeRadio.isSelected) emptyMap() else localizedFields.mapValues { it.value.text },
-        translatable = !untranslatableCheck.isSelected,
-        type = if (arrayTypeRadio.isSelected) ComposeResourceType.STRING_ARRAY else ComposeResourceType.STRING,
-        defaultItems = if (arrayTypeRadio.isSelected) {
-            arrayItemFields.map { fields -> ComposeResourceItem(fields.name, fields.defaultField.text) }
-        } else {
-            emptyList()
-        },
-        localizedItems = if (arrayTypeRadio.isSelected) {
-            qualifiers.associateWith { qualifier ->
-                arrayItemFields.map { fields ->
-                    ComposeResourceItem(fields.name, fields.localizedFields.getValue(qualifier).text)
-                }
+    fun draft(): StringResourceDraft {
+        val type = when {
+            arrayTypeRadio.isSelected -> ComposeResourceType.STRING_ARRAY
+            pluralsTypeRadio.isSelected -> ComposeResourceType.PLURALS
+            else -> ComposeResourceType.STRING
+        }
+        val itemFields = when (type) {
+            ComposeResourceType.STRING_ARRAY -> arrayItemFields.map { fields ->
+                ComposeResourceItem(fields.name, fields.defaultField.text)
             }
-        } else {
-            emptyMap()
-        },
-    )
+            ComposeResourceType.PLURALS -> pluralItemFields.map { fields ->
+                ComposeResourceItem(fields.name, fields.defaultField.text)
+            }
+            ComposeResourceType.STRING -> emptyList()
+        }
+        return StringResourceDraft(
+            key = keyField.text.trim(),
+            defaultValue = if (type == ComposeResourceType.STRING) defaultField.text else "",
+            localizedValues = if (type == ComposeResourceType.STRING) {
+                localizedFields.mapValues { it.value.text }
+            } else {
+                emptyMap()
+            },
+            translatable = !untranslatableCheck.isSelected,
+            type = type,
+            defaultItems = itemFields,
+            localizedItems = when (type) {
+                ComposeResourceType.STRING -> emptyMap()
+                ComposeResourceType.STRING_ARRAY -> qualifiers.associateWith { qualifier ->
+                    arrayItemFields.map { field ->
+                        ComposeResourceItem(field.name, field.localizedFields.getValue(qualifier).text)
+                    }
+                }
+                ComposeResourceType.PLURALS -> qualifiers.associateWith { qualifier ->
+                    pluralItemFields.map { field ->
+                        ComposeResourceItem(field.name, field.localizedFields.getValue(qualifier).text)
+                    }
+                }
+            },
+        )
+    }
 
     override fun createCenterPanel(): JComponent {
         val typeSelector = JPanel(FlowLayout(FlowLayout.LEADING, 8, 0)).apply {
@@ -633,6 +672,7 @@ internal class AddStringDialog(
         }
         typeCards.add(createStringFields(), "string")
         typeCards.add(createArrayFields(), "string-array")
+        typeCards.add(createPluralFields(), "plurals")
         showTypeCard()
         return JPanel(BorderLayout(0, 8)).apply {
             add(typeSelector, BorderLayout.NORTH)
@@ -640,7 +680,10 @@ internal class AddStringDialog(
                 add(commonFields, BorderLayout.NORTH)
                 add(typeCards, BorderLayout.CENTER)
             }, BorderLayout.CENTER)
-            preferredSize = JBUI.size(680, 140 + qualifiers.size * 42 + arrayItemFields.size * 42)
+            preferredSize = JBUI.size(
+                680,
+                140 + qualifiers.size * 42 + maxOf(arrayItemFields.size, pluralItemFields.size) * 42,
+            )
         }
     }
 
@@ -664,6 +707,12 @@ internal class AddStringDialog(
         }, BorderLayout.SOUTH)
     }
 
+    private fun createPluralFields(): JComponent = JPanel(BorderLayout(0, 4)).apply {
+        isOpaque = false
+        add(JBLabel(MyBundle.message("translation.dialog.plurals.items")), BorderLayout.NORTH)
+        add(JScrollPane(pluralItemsPanel).apply { border = null }, BorderLayout.CENTER)
+    }
+
     private fun buildInitialArrayItems(): List<ComposeResourceItem> {
         val names = buildList {
             initialArrayItems.forEach { add(it.name) }
@@ -672,6 +721,11 @@ internal class AddStringDialog(
         return if (names.isEmpty()) listOf(ComposeResourceItem("0", "")) else names.map { name ->
             initialArrayItems.firstOrNull { it.name == name } ?: ComposeResourceItem(name, "")
         }
+    }
+
+    private fun buildInitialPluralItems(): List<ComposeResourceItem> = ComposePluralQuantities.all.map { name ->
+        initialArrayItems.firstOrNull { it.name == name }
+            ?: ComposeResourceItem(name, "")
     }
 
     private fun addArrayItemRow(item: ComposeResourceItem) = addArrayItemRow(item.name, item.value)
@@ -739,6 +793,56 @@ internal class AddStringDialog(
         arrayItemsPanel.revalidate()
     }
 
+    private fun addPluralItemRow(item: ComposeResourceItem) {
+        val defaultField = JBTextField(item.value).apply { columns = 16 }
+        val localized = qualifiers.associateWith { qualifier ->
+            JBTextField(initialLocalizedItems[qualifier].orEmpty().firstOrNull { it.name == item.name }?.value.orEmpty()).apply {
+                columns = 12
+            }
+        }
+        pluralItemFields += PluralItemFields(item.name, defaultField, localized)
+        pluralItemsPanel.add(JPanel(GridBagLayout()).apply {
+            isOpaque = false
+            alignmentX = Component.LEFT_ALIGNMENT
+            val labelConstraints = GridBagConstraints().apply {
+                gridx = 0
+                fill = GridBagConstraints.NONE
+                anchor = GridBagConstraints.LINE_START
+                insets = Insets(2, 4, 2, 4)
+            }
+            add(pluralQuantityLabel(item.name), labelConstraints)
+            val fieldConstraints = GridBagConstraints().apply {
+                fill = GridBagConstraints.HORIZONTAL
+                weightx = 1.0
+                gridy = 0
+                insets = Insets(2, 4, 2, 4)
+            }
+            defaultField.minimumSize = Dimension(0, defaultField.preferredSize.height)
+            fieldConstraints.gridx = 1
+            add(defaultField, fieldConstraints)
+            localized.forEach { (qualifier, field) ->
+                field.toolTipText = qualifier.displayName
+                field.minimumSize = Dimension(0, field.preferredSize.height)
+                fieldConstraints.gridx += 1
+                add(field, fieldConstraints.clone() as GridBagConstraints)
+            }
+            maximumSize = Dimension(Int.MAX_VALUE, preferredSize.height)
+        })
+        pluralItemsPanel.revalidate()
+    }
+
+    private fun pluralQuantityLabel(name: String): JBLabel {
+        val label = JBLabel("[$name]")
+        val width = ComposePluralQuantities.all.maxOf { quantity ->
+            JBLabel("[$quantity]").preferredSize.width
+        }
+        val fixedSize = Dimension(width, label.preferredSize.height)
+        label.minimumSize = fixedSize
+        label.preferredSize = fixedSize
+        label.maximumSize = fixedSize
+        return label
+    }
+
     private fun renumberArrayItems() {
         arrayItemFields.forEachIndexed { index, fields ->
             fields.name = index.toString()
@@ -752,7 +856,12 @@ internal class AddStringDialog(
 
     private fun showTypeCard() {
         val layout = typeCards.layout as CardLayout
-        layout.show(typeCards, if (arrayTypeRadio.isSelected) "string-array" else "string")
+        val card = when {
+            arrayTypeRadio.isSelected -> "string-array"
+            pluralsTypeRadio.isSelected -> "plurals"
+            else -> "string"
+        }
+        layout.show(typeCards, card)
     }
 
     override fun doValidate(): ValidationInfo? = if (keyField.text.trim().isEmpty()) {

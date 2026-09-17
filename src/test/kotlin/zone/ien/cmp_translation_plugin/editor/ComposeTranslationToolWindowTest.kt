@@ -385,6 +385,77 @@ class ComposeTranslationToolWindowTest : BasePlatformTestCase() {
         assertEquals(listOf("0"), dialog.draft().defaultItems.map(ComposeResourceItem::name))
     }
 
+    fun testPluralDialogPrefillsAllQuantityFields() {
+        val dialog = AddStringDialog(
+            project = project,
+            qualifiers = listOf(ComposeResourceQualifier("ko")),
+            initialKey = "inbox_count",
+            initialType = ComposeResourceType.PLURALS,
+        )
+
+        val draft = dialog.draft()
+
+        assertEquals(ComposeResourceType.PLURALS, draft.type)
+        assertEquals(listOf("zero", "one", "two", "few", "many", "other"), draft.defaultItems.map(ComposeResourceItem::name))
+        assertEquals(
+            listOf("zero", "one", "two", "few", "many", "other"),
+            draft.localizedItems.getValue(ComposeResourceQualifier("ko")).map(ComposeResourceItem::name),
+        )
+        assertTrue(draft.defaultItems.all { it.value.isEmpty() })
+    }
+
+    fun testPluralDialogKeepsLocalizedValuesInTheirLocaleFields() {
+        val ko = ComposeResourceQualifier("ko")
+        val dialog = AddStringDialog(
+            project = project,
+            qualifiers = listOf(ko),
+            initialKey = "inbox_count",
+            initialType = ComposeResourceType.PLURALS,
+            initialLocalizedItems = mapOf(ko to listOf(ComposeResourceItem("one", "메시지 1개"))),
+        )
+
+        val draft = dialog.draft()
+
+        assertEquals("", draft.defaultItems.first { it.name == "one" }.value)
+        assertEquals("메시지 1개", draft.localizedItems.getValue(ko).first { it.name == "one" }.value)
+    }
+
+    fun testPluralQuantityLabelsUseTheSameWidth() {
+        val dialog = AddStringDialog(
+            project = project,
+            qualifiers = emptyList(),
+            initialType = ComposeResourceType.PLURALS,
+        )
+
+        val labels = descendants(dialogContent(dialog))
+            .filterIsInstance<JLabel>()
+            .filter { it.text in setOf("[zero]", "[one]", "[two]", "[few]", "[many]", "[other]") }
+
+        assertEquals(6, labels.size)
+        assertEquals(1, labels.map { it.preferredSize.width }.distinct().size)
+    }
+
+    fun testToolWindowHidesBlankPluralQuantityRows() {
+        myFixture.tempDirFixture.createFile(
+            "src/commonMain/composeResources/values/strings.xml",
+            """
+            <resources>
+                <plurals name="inbox_count">
+                    <item quantity="zero"></item>
+                    <item quantity="one">%d message</item>
+                    <item quantity="other">%d messages</item>
+                </plurals>
+            </resources>
+            """.trimIndent(),
+        )
+
+        val content = ComposeTranslationToolWindow(project).component
+        val table = descendants(content).filterIsInstance<JTable>().single()
+
+        assertEquals(3, table.rowCount)
+        assertEquals(listOf("inbox_count", "└ one", "└ other"), (0 until table.rowCount).map { table.getValueAt(it, 0).toString() })
+    }
+
     fun testStringArrayDialogInitiallyShowsArrayFields() {
         val dialog = AddStringDialog(
             project = project,
