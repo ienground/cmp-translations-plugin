@@ -42,7 +42,7 @@ A powerful IntelliJ Platform plugin for IntelliJ IDEA and Android Studio designe
 | **Placeholder Mismatch Detection** | ✅ Supported | ✅ Supported | 100% | Regex printf token validator (`%s`, `%d`, etc.) |
 | **Direct XML Tag Navigation** | ✅ Supported | ✅ Supported | 100% | PSI Element target locator (double-click cell) |
 | **Status Filter (`All`, `Missing`, `Complete`)** | ✅ Supported | ✅ Supported | 100% | Dynamic table row filter model |
-| **Plural Resources (`<plurals>`)** | 🟡 Planned | 🟡 Planned | 0% | In Roadmap |
+| **Plural Resources (`<plurals>`)** | ✅ Supported | ✅ Supported | 100% | Hierarchical plural quantity editing |
 | **String Array Resources (`<string-array>`)** | ✅ Supported | ✅ Supported | 100% | Hierarchical array item editing |
 | **AI Translation Provider Integration** | 🟡 Planned | 🟡 Planned | 0% | In Roadmap |
 
@@ -234,7 +234,7 @@ fun WelcomeScreen(userName: String, count: Int) {
 
 ## Platform Limitations & Constraints
 
-- **Supported Tags**: Supports single-value `<string name="...">...</string>` and string-array `<string-array name="..."><item>...</item></string-array>` tags. Multi-value `<plurals>` remains planned.
+- **Supported Tags**: Supports single-value `<string name="...">...</string>`, string-array `<string-array name="..."><item>...</item></string-array>`, and plural `<plurals name="..."><item quantity="...">...</item></plurals>` tags.
 - **Directory Conventions**: Files must reside under standard `composeResources/**/values*/strings.xml` directories to be indexed automatically.
 - **Platform Qualifiers**: Qualifier naming follows Android / Compose Multiplatform conventions (e.g. `values`, `values-ko`, `values-en-rUS`, `values-b+sr+Latn`).
 
