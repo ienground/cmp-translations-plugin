@@ -159,7 +159,7 @@ class ComposeTranslationToolWindowTest : BasePlatformTestCase() {
 
         val content = ComposeTranslationToolWindow(project).component
         val searchField = descendants(content).filterIsInstance<EllipsisTextField>().single()
-        val combo = descendants(content).filterIsInstance<JComboBox<*>>().first()
+        val combo = resourceSetCombo(content)
         @Suppress("UNCHECKED_CAST")
         val renderer = combo.renderer as ListCellRenderer<Any?>
         val rendered = renderer.getListCellRendererComponent(
@@ -227,10 +227,11 @@ class ComposeTranslationToolWindowTest : BasePlatformTestCase() {
 
         val content = ComposeTranslationToolWindow(project).component
         val searchField = descendants(content).filterIsInstance<JBTextField>().single()
-        val combo = descendants(content).filterIsInstance<JComboBox<*>>().first()
+        val combo = resourceSetCombo(content)
         val status = descendants(content).filterIsInstance<JLabel>().single { label ->
             label.text != MyBundle.message("translation.resource-set.label") &&
-                label.text != MyBundle.message("translation.search.label")
+                label.text != MyBundle.message("translation.search.label") &&
+                label.text != MyBundle.message("translation.display-language.label")
         }
         val option = combo.selectedItem as ResourceSetOption
 
@@ -393,7 +394,7 @@ class ComposeTranslationToolWindowTest : BasePlatformTestCase() {
         )
 
         val content = ComposeTranslationToolWindow(project).component
-        val combo = descendants(content).filterIsInstance<JComboBox<*>>().first()
+        val combo = resourceSetCombo(content)
         assertEquals(2, combo.itemCount)
 
         @Suppress("UNCHECKED_CAST")
@@ -408,6 +409,24 @@ class ComposeTranslationToolWindowTest : BasePlatformTestCase() {
 
         val moduleBadge = descendants(rendered).filterIsInstance<ModuleBadge>().single()
         assertTrue(moduleBadge.text.isNotBlank())
+    }
+
+    fun testLanguageSelectorShowsResourceLocalesAndUpdatesDisplaySetting() {
+        createResourceFiles()
+
+        val content = ComposeTranslationToolWindow(project).component
+        val combos = descendants(content).filterIsInstance<JComboBox<*>>()
+        val languageCombo = combos.single { combo ->
+            combo.itemCount == 2 &&
+                (combo.getItemAt(1) as? ComposeResourceQualifier)?.rawValue == "ko"
+        }
+
+        languageCombo.selectedItem = ComposeResourceQualifier("ko")
+
+        assertEquals(
+            ComposeResourceQualifier("ko"),
+            ComposeTranslationDisplaySettings.getInstance(project).selectedQualifier,
+        )
     }
 
     private fun createResourceFiles(localizedXml: String = "<resources><string name=\"login\">로그인</string></resources>") {
@@ -427,6 +446,11 @@ class ComposeTranslationToolWindowTest : BasePlatformTestCase() {
             component.components.forEach { addAll(descendants(it)) }
         }
     }
+
+    private fun resourceSetCombo(content: Component): JComboBox<*> =
+        descendants(content).filterIsInstance<JComboBox<*>>().single { combo ->
+            combo.getItemAt(0) is ResourceSetOption
+        }
 
     private fun layoutRecursively(component: Component) {
         if (component !is java.awt.Container) return

@@ -21,6 +21,10 @@
             <className>zone.ien.cmp_translation_plugin.editor.ComposeStringResourceIntentionAction</className>
         </intentionAction>
         <gotoDeclarationHandler implementation="zone.ien.cmp_translation_plugin.editor.ComposeTranslationGotoDeclarationHandler" order="first"/>
+        <lang.foldingBuilder
+                implementationClass="zone.ien.cmp_translation_plugin.editor.ComposeTranslationFoldingBuilder"
+                language="kotlin"
+        />
         <toolWindow
                 doNotActivateOnStart="false"
                 factoryClass="zone.ien.cmp_translation_plugin.toolWindow.MyToolWindowFactory"
