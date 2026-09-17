@@ -1,6 +1,8 @@
 package zone.ien.cmp_translation_plugin.editor
 
 import com.intellij.icons.AllIcons
+import com.intellij.codeInsight.folding.CodeFoldingManager
+import com.intellij.codeInsight.daemon.DaemonCodeAnalyzer
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.DataContext
 import com.intellij.openapi.actionSystem.DefaultActionGroup
@@ -14,6 +16,8 @@ import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.ui.ValidationInfo
 import com.intellij.openapi.fileEditor.OpenFileDescriptor
+import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.fileEditor.TextEditor
 import com.intellij.openapi.ui.popup.JBPopupFactory
 import com.intellij.openapi.util.Computable
 import com.intellij.openapi.vfs.VirtualFileManager
@@ -61,6 +65,7 @@ import java.awt.event.MouseEvent
 import javax.swing.DefaultComboBoxModel
 import javax.swing.DefaultCellEditor
 import javax.swing.ButtonGroup
+import javax.swing.DefaultListCellRenderer
 import javax.swing.JButton
 import javax.swing.JComponent
 import javax.swing.JList
@@ -100,6 +105,9 @@ class ComposeTranslationToolWindow(private val project: Project) {
         renderer = ResourceSetOptionRenderer()
     }
     private val resourceSetControl = FlexibleControlHost(resourceSetCombo)
+    private val languageCombo = ComboBox<ComposeResourceQualifier>().apply {
+        renderer = TranslationLanguageRenderer()
+    }
     private val statusLabel = JBLabel()
     private val catalog = ComposeResourceCatalog(project)
     private val validator = ComposeResourceValidator()
@@ -151,7 +159,20 @@ class ComposeTranslationToolWindow(private val project: Project) {
                 if (table.isEditing) table.cellEditor?.stopCellEditing()
             }
         })
-        resourceSetCombo.addActionListener { renderSelectedResourceSet() }
+        resourceSetCombo.addActionListener {
+            applyLanguageOptions(selectedResourceSet())
+            renderSelectedResourceSet()
+        }
+        languageCombo.addActionListener {
+            val qualifier = languageCombo.selectedItem as? ComposeResourceQualifier ?: return@addActionListener
+            ComposeTranslationDisplaySettings.getInstance(project).select(qualifier)
+            DaemonCodeAnalyzer.getInstance(project).restart()
+            FileEditorManager.getInstance(project).allEditors
+                .filterIsInstance<TextEditor>()
+                .forEach { editor ->
+                    CodeFoldingManager.getInstance(project).updateFoldRegions(editor.editor)
+                }
+        }
         resourceSetCombo.addFocusListener(object : java.awt.event.FocusAdapter() {
             override fun focusGained(e: java.awt.event.FocusEvent?) {
                 if (table.isEditing) table.cellEditor?.stopCellEditing()
@@ -180,6 +201,7 @@ class ComposeTranslationToolWindow(private val project: Project) {
             onAddString = ::addString,
             onDeleteSelected = ::deleteSelected,
             onRefresh = ::reload,
+            displayLanguage = languageCombo,
         )
         val controls = ResponsiveControlsPanel(
             resourceSetCombo = resourceSetControl,
@@ -268,8 +290,19 @@ class ComposeTranslationToolWindow(private val project: Project) {
                 resourceSetCombo.selectedItem = matchingOption
             }
         }
-        
+        applyLanguageOptions((resourceSetCombo.selectedItem as? ResourceSetOption)?.resourceSet)
         renderSelectedResourceSet()
+    }
+
+    private fun applyLanguageOptions(resourceSet: ComposeResourceSet?) {
+        val options = resourceSet?.let(ComposeTranslationLanguageSelection::options).orEmpty()
+        val settings = ComposeTranslationDisplaySettings.getInstance(project)
+        val selected = options.firstOrNull { it == settings.selectedQualifier } ?: options.firstOrNull()
+        languageCombo.model = DefaultComboBoxModel(options.toTypedArray())
+        languageCombo.selectedItem = selected
+        if (selected != null && selected != settings.selectedQualifier) {
+            settings.select(selected)
+        }
     }
 
     private fun renderSelectedResourceSet() {
@@ -723,19 +756,24 @@ internal class TranslationToolbar(
     onAddString: () -> Unit,
     onDeleteSelected: () -> Unit,
     onRefresh: () -> Unit,
-) : JPanel(WrapLayout(FlowLayout.LEADING, 4, 0)) {
+    displayLanguage: JComponent,
+) : JPanel(BorderLayout(8, 0)) {
+
+    private val actions = JPanel(WrapLayout(FlowLayout.LEADING, 4, 0)).apply {
+        isOpaque = false
+    }
 
     init {
         isOpaque = false
         border = JBUI.Borders.empty(2, 0)
-        add(
+        actions.add(
             toolbarButton(
                 icon = AllIcons.General.Add,
                 tooltip = MyBundle.message("translation.toolbar.add"),
                 onClick = onAddString,
             ),
         )
-        add(
+        actions.add(
             toolbarButton(
                 icon = IconUtil.colorize(
                     AllIcons.General.Delete,
@@ -746,14 +784,14 @@ internal class TranslationToolbar(
                 onClick = onDeleteSelected,
             ),
         )
-        add(
+        actions.add(
             toolbarButton(
                 icon = AllIcons.Actions.Refresh,
                 tooltip = MyBundle.message("translation.toolbar.refresh"),
                 onClick = onRefresh,
             ),
         )
-        add(
+        actions.add(
             toolbarButton(
                 icon = AllIcons.General.Export,
                 tooltip = MyBundle.message("translation.toolbar.export"),
@@ -761,6 +799,21 @@ internal class TranslationToolbar(
                 onClick = {},
             ),
         )
+        add(actions, BorderLayout.CENTER)
+
+        add(
+            JPanel(FlowLayout(FlowLayout.TRAILING, 4, 0)).apply {
+                isOpaque = false
+                add(JBLabel(MyBundle.message("translation.display-language.label")))
+                add(displayLanguage)
+            },
+            BorderLayout.EAST,
+        )
+    }
+
+    override fun doLayout() {
+        super.doLayout()
+        actions.doLayout()
     }
 }
 
@@ -942,6 +995,23 @@ internal class ResourceSetOptionRenderer : JPanel(BorderLayout(6, 2)),
         foreground = if (isSelected) list.selectionForeground else list.foreground
         resourceSetLabel.foreground = foreground
         return this
+    }
+}
+
+internal class TranslationLanguageRenderer : ListCellRenderer<ComposeResourceQualifier> {
+
+    private val delegate = DefaultListCellRenderer()
+
+    override fun getListCellRendererComponent(
+        list: JList<out ComposeResourceQualifier>,
+        value: ComposeResourceQualifier?,
+        index: Int,
+        isSelected: Boolean,
+        cellHasFocus: Boolean,
+    ): Component {
+        delegate.getListCellRendererComponent(list, value, index, isSelected, cellHasFocus)
+        delegate.text = value?.displayName.orEmpty()
+        return delegate
     }
 }
 
