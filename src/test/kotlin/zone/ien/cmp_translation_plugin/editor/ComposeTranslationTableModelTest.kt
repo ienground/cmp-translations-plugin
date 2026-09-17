@@ -2,6 +2,8 @@ package zone.ien.cmp_translation_plugin.editor
 
 import zone.ien.cmp_translation_plugin.resource.ComposeResourceQualifier
 import zone.ien.cmp_translation_plugin.resource.ComposeStringEntry
+import zone.ien.cmp_translation_plugin.resource.ComposeResourceItem
+import zone.ien.cmp_translation_plugin.resource.ComposeResourceType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -100,4 +102,79 @@ class ComposeTranslationTableModelTest {
 
         assertEquals("login" to "sign_in", editedKey)
     }
+
+    @Test
+    fun flattensArrayItemsAndCanCollapseTheirParentRow() {
+        val model = ComposeTranslationTableModel()
+        model.setEntries(
+            defaultEntries = listOf(
+                ComposeStringEntry(
+                    key = "menu",
+                    value = "",
+                    type = ComposeResourceType.STRING_ARRAY,
+                    items = listOf(
+                        ComposeResourceItem("0", "Home"),
+                        ComposeResourceItem("1", "Settings"),
+                    ),
+                ),
+            ),
+            localizedEntries = mapOf(
+                ko to listOf(
+                    ComposeStringEntry(
+                        key = "menu",
+                        value = "",
+                        type = ComposeResourceType.STRING_ARRAY,
+                        items = listOf(
+                            ComposeResourceItem("0", "홈"),
+                            ComposeResourceItem("1", "설정"),
+                        ),
+                    ),
+                ),
+            ),
+            issues = emptyList(),
+        )
+
+        assertEquals(3, model.rowCount)
+        assertEquals("menu", model.getValueAt(0, 0))
+        assertEquals("└ 0", model.getValueAt(1, 0))
+        assertEquals(1, model.visibleRows()[1].depth)
+        assertTrue(model.toggleExpanded(0))
+        assertEquals(1, model.rowCount)
+        assertTrue(model.toggleExpanded(0))
+        assertEquals(3, model.rowCount)
+    }
+
+    @Test
+    fun forwardsArrayItemEditsWithParentKeyAndItemName() {
+        val model = ComposeTranslationTableModel()
+        var edited: Quadruple<String, String, ComposeResourceQualifier?, String>? = null
+        model.onItemValueEdited = { key, itemName, qualifier, value ->
+            edited = Quadruple(key, itemName, qualifier, value)
+        }
+        model.setEntries(
+            defaultEntries = listOf(
+                ComposeStringEntry(
+                    key = "menu",
+                    value = "",
+                    type = ComposeResourceType.STRING_ARRAY,
+                    items = listOf(ComposeResourceItem("0", "Home")),
+                ),
+            ),
+            localizedEntries = mapOf(ko to listOf(
+                ComposeStringEntry(
+                    key = "menu",
+                    value = "",
+                    type = ComposeResourceType.STRING_ARRAY,
+                    items = listOf(ComposeResourceItem("0", "홈")),
+                ),
+            )),
+            issues = emptyList(),
+        )
+
+        model.setValueAt("집", 1, 3)
+
+        assertEquals(Quadruple("menu", "0", ko, "집"), edited)
+    }
+
+    private data class Quadruple<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
 }

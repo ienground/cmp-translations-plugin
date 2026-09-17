@@ -7,11 +7,30 @@ class ComposeStringsXmlParser {
 
     fun parse(file: XmlFile): List<ComposeStringEntry> =
         file.rootTag
-            ?.findSubTags("string")
+            ?.subTags
             ?.mapNotNull { tag ->
-                tag.getAttributeValue("name")?.let { key ->
-                    val translatable = tag.getAttributeValue("translatable") != "false"
-                    ComposeStringEntry(key = key, value = tag.value.text, translatable = translatable)
+                val key = tag.getAttributeValue("name") ?: return@mapNotNull null
+                val translatable = tag.getAttributeValue("translatable") != "false"
+                when (tag.name) {
+                    "string" -> ComposeStringEntry(
+                        key = key,
+                        value = tag.value.text,
+                        translatable = translatable,
+                    )
+                    "string-array" -> {
+                        val items = tag.findSubTags("item").mapIndexed { index, item ->
+                            ComposeResourceItem(name = index.toString(), value = item.value.text)
+                        }
+                        ComposeStringEntry(
+                            key = key,
+                            value = "",
+                            translatable = translatable,
+                            placeholders = items.flatMap(ComposeResourceItem::placeholders),
+                            type = ComposeResourceType.STRING_ARRAY,
+                            items = items,
+                        )
+                    }
+                    else -> null
                 }
             }
             .orEmpty()

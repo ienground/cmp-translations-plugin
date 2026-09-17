@@ -25,6 +25,8 @@ import javax.swing.SwingUtilities
 import java.util.concurrent.atomic.AtomicReference
 import zone.ien.cmp_translation_plugin.MyBundle
 import zone.ien.cmp_translation_plugin.resource.ComposeResourceQualifier
+import zone.ien.cmp_translation_plugin.resource.ComposeResourceType
+import zone.ien.cmp_translation_plugin.resource.ComposeResourceItem
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -368,6 +370,49 @@ class ComposeTranslationToolWindowTest : BasePlatformTestCase() {
         assertEquals("hello_world", draft.key)
         assertEquals("Hello world", draft.defaultValue)
         assertEquals("", draft.localizedValues[ComposeResourceQualifier("ko")])
+    }
+
+    fun testAddStringDialogSwitchesBetweenStringAndStringArrayTypes() {
+        val dialog = AddStringDialog(
+            project = project,
+            qualifiers = listOf(ComposeResourceQualifier("ko")),
+            initialKey = "menu",
+        )
+        val radios = dialog.typeRadioButtons
+        val arrayRadio = radios.single { it.text == "String array" }
+
+        assertEquals(ComposeResourceType.STRING, dialog.draft().type)
+        arrayRadio.doClick()
+        assertEquals(ComposeResourceType.STRING_ARRAY, dialog.draft().type)
+        assertEquals(listOf("0"), dialog.draft().defaultItems.map(ComposeResourceItem::name))
+    }
+
+    fun testToolWindowDisplaysExpandedStringArrayRowsWithIndentedKeys() {
+        myFixture.tempDirFixture.createFile(
+            "src/commonMain/composeResources/values/strings.xml",
+            """
+            <resources>
+                <string-array name="menu"><item>Home</item><item>Settings</item></string-array>
+            </resources>
+            """.trimIndent(),
+        )
+        myFixture.tempDirFixture.createFile(
+            "src/commonMain/composeResources/values-ko/strings.xml",
+            """
+            <resources>
+                <string-array name="menu"><item>홈</item><item>설정</item></string-array>
+            </resources>
+            """.trimIndent(),
+        )
+
+        val content = ComposeTranslationToolWindow(project).component
+        val table = descendants(content).filterIsInstance<JTable>().single()
+        val renderer = table.columnModel.getColumn(0).cellRenderer
+
+        assertEquals(3, table.rowCount)
+        assertTrue(table.getValueAt(1, 0).toString().contains("0"))
+        val rendered = renderer.getTableCellRendererComponent(table, table.getValueAt(1, 0), false, false, 1, 0)
+        assertTrue((rendered as JLabel).text.contains("└ 0"))
     }
 
     fun testToolbarWrapsWhenWindowBecomesNarrow() {

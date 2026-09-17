@@ -1,6 +1,7 @@
 package zone.ien.cmp_translation_plugin.validation
 
 import zone.ien.cmp_translation_plugin.resource.ComposeResourceQualifier
+import zone.ien.cmp_translation_plugin.resource.ComposeResourceType
 import zone.ien.cmp_translation_plugin.resource.ComposeStringEntry
 
 enum class ComposeResourceIssueType {
@@ -8,6 +9,9 @@ enum class ComposeResourceIssueType {
     ORPHAN_KEY,
     DUPLICATE_KEY,
     PLACEHOLDER_MISMATCH,
+    TYPE_MISMATCH,
+    MISSING_ITEM,
+    EXTRA_ITEM,
 }
 
 data class ComposeResourceIssue(
@@ -16,6 +20,7 @@ data class ComposeResourceIssue(
     val qualifier: ComposeResourceQualifier?,
     val expectedPlaceholders: List<String> = emptyList(),
     val actualPlaceholders: List<String> = emptyList(),
+    val itemName: String? = null,
 )
 
 /** Compares the default strings.xml entries with each localized file. */
@@ -60,14 +65,57 @@ class ComposeResourceValidator {
 
             localizedByKey.forEach { (key, localizedEntry) ->
                 val defaultEntry = defaultByKey[key] ?: return@forEach
-                if (defaultEntry.placeholders != localizedEntry.placeholders) {
+                if (defaultEntry.type != localizedEntry.type) {
                     issues += ComposeResourceIssue(
-                        type = ComposeResourceIssueType.PLACEHOLDER_MISMATCH,
+                        type = ComposeResourceIssueType.TYPE_MISMATCH,
                         key = key,
                         qualifier = qualifier,
-                        expectedPlaceholders = defaultEntry.placeholders,
-                        actualPlaceholders = localizedEntry.placeholders,
                     )
+                    return@forEach
+                }
+
+                if (defaultEntry.type == ComposeResourceType.STRING) {
+                    if (defaultEntry.placeholders != localizedEntry.placeholders) {
+                        issues += ComposeResourceIssue(
+                            type = ComposeResourceIssueType.PLACEHOLDER_MISMATCH,
+                            key = key,
+                            qualifier = qualifier,
+                            expectedPlaceholders = defaultEntry.placeholders,
+                            actualPlaceholders = localizedEntry.placeholders,
+                        )
+                    }
+                } else {
+                    val localizedItems = localizedEntry.items.associateBy { it.name }
+                    defaultEntry.items.forEach { defaultItem ->
+                        val localizedItem = localizedItems[defaultItem.name]
+                        if (localizedItem == null || localizedItem.value.isBlank()) {
+                            issues += ComposeResourceIssue(
+                                type = ComposeResourceIssueType.MISSING_ITEM,
+                                key = key,
+                                qualifier = qualifier,
+                                itemName = defaultItem.name,
+                            )
+                        } else if (defaultItem.placeholders != localizedItem.placeholders) {
+                            issues += ComposeResourceIssue(
+                                type = ComposeResourceIssueType.PLACEHOLDER_MISMATCH,
+                                key = key,
+                                qualifier = qualifier,
+                                expectedPlaceholders = defaultItem.placeholders,
+                                actualPlaceholders = localizedItem.placeholders,
+                                itemName = defaultItem.name,
+                            )
+                        }
+                    }
+                    localizedEntry.items
+                        .filterNot { localizedItem -> defaultEntry.items.any { it.name == localizedItem.name } }
+                        .forEach { localizedItem ->
+                            issues += ComposeResourceIssue(
+                                type = ComposeResourceIssueType.EXTRA_ITEM,
+                                key = key,
+                                qualifier = qualifier,
+                                itemName = localizedItem.name,
+                            )
+                        }
                 }
             }
         }

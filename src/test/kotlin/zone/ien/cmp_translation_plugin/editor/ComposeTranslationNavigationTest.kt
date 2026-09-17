@@ -19,6 +19,13 @@ class ComposeTranslationNavigationTest : BasePlatformTestCase() {
             ),
         )
         assertEquals(
+            "menu",
+            ComposeTranslationNavigation.extractResourceKey(
+                sourceText = "Res.array.menu",
+                ancestorTexts = emptyList(),
+            ),
+        )
+        assertEquals(
             "login",
             ComposeTranslationNavigation.extractResourceKey(
                 sourceText = "login",

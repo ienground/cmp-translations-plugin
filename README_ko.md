@@ -39,7 +39,7 @@ IntelliJ IDEA 및 Android Studio에서 Compose Multiplatform의 `composeResource
 | **XML 태그 직접 이동** | ✅ 지원 | ✅ 지원 | 100% | PSI 요소 타깃 로케이터 (셀 더블 클릭) |
 | **상태 필터 (`전체`, `누락`, `완료`)** | ✅ 지원 | ✅ 지원 | 100% | 동적 테이블 행 필터 모델 |
 | **복수형 리소스 (`<plurals>`)** | 🟡 예정 | 🟡 예정 | 0% | 로드맵 예정 |
-| **문자열 배열 리소스 (`<string-array>`)** | 🟡 예정 | 🟡 예정 | 0% | 로드맵 예정 |
+| **문자열 배열 리소스 (`<string-array>`)** | ✅ 지원 | ✅ 지원 | 100% | 계층형 배열 항목 편집 |
 | **AI 번역 프로바이더 연동** | 🟡 예정 | 🟡 예정 | 0% | 로드맵 예정 |
 
 ---
@@ -230,7 +230,7 @@ fun WelcomeScreen(userName: String, count: Int) {
 
 ## 플랫폼 제약 사항 및 제한
 
-- **지원 태그**: 현재는 단일 문자열 `<string name="...">...</string>` 태그를 지원합니다. 다중값 `<plurals>` 및 `<string-array>` 태그는 후속 릴리스에서 지원될 예정입니다.
+- **지원 태그**: 단일 문자열 `<string name="...">...</string>`과 문자열 배열 `<string-array name="..."><item>...</item></string-array>`을 지원합니다. 다중값 `<plurals>`는 후속 릴리스에서 지원될 예정입니다.
 - **디렉터리 규칙**: 표준 `composeResources/**/values*/strings.xml` 경로에 위치한 파일만 자동으로 탐지 및 인덱싱됩니다.
 - **로케일 Qualifier**: Android 및 Compose Multiplatform 표준 규칙(`values`, `values-ko`, `values-en-rUS`, `values-b+sr+Latn` 등)을 지원합니다.
 
