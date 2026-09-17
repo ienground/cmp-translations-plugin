@@ -12,6 +12,7 @@ import java.awt.FontMetrics
 import java.awt.Insets
 import java.awt.image.BufferedImage
 import javax.swing.JButton
+import javax.swing.JCheckBox
 import javax.swing.JComboBox
 import javax.swing.JList
 import javax.swing.JLabel
@@ -384,6 +385,20 @@ class ComposeTranslationToolWindowTest : BasePlatformTestCase() {
         assertEquals(listOf("0"), dialog.draft().defaultItems.map(ComposeResourceItem::name))
     }
 
+    fun testStringArrayDialogInitiallyShowsArrayFields() {
+        val dialog = AddStringDialog(
+            project = project,
+            qualifiers = emptyList(),
+            initialType = ComposeResourceType.STRING_ARRAY,
+            initialArrayItems = listOf(ComposeResourceItem("0", "Zero")),
+        )
+
+        dialogContent(dialog)
+        val visibleCard = typeCards(dialog).components.single { it.isVisible }
+
+        assertTrue(descendants(visibleCard).contains(arrayItemsPanel(dialog)))
+    }
+
     fun testStringArrayItemsAreRenumberedAfterDeleteAndAdd() {
         val dialog = AddStringDialog(
             project = project,
@@ -513,6 +528,36 @@ class ComposeTranslationToolWindowTest : BasePlatformTestCase() {
         assertTrue((rendered as JLabel).text.contains("└ 0"))
     }
 
+    fun testStringArrayChildrenHideUntranslatableCheckbox() {
+        myFixture.tempDirFixture.createFile(
+            "src/commonMain/composeResources/values/strings.xml",
+            "<resources><string-array name=\"menu\"><item>Home</item></string-array></resources>",
+        )
+
+        val content = ComposeTranslationToolWindow(project).component
+        val table = descendants(content).filterIsInstance<JTable>().single()
+        val childRenderer = table.getCellRenderer(1, 1)
+        val childComponent = childRenderer.getTableCellRendererComponent(
+            table,
+            table.getValueAt(1, 1),
+            false,
+            false,
+            1,
+            1,
+        )
+        val parentComponent = table.getCellRenderer(0, 1).getTableCellRendererComponent(
+            table,
+            table.getValueAt(0, 1),
+            false,
+            false,
+            0,
+            1,
+        )
+
+        assertFalse(descendants(childComponent).any { it is JCheckBox })
+        assertTrue(descendants(parentComponent).any { it is JCheckBox })
+    }
+
     fun testToolbarWrapsWhenWindowBecomesNarrow() {
         createResourceFiles()
 
@@ -611,6 +656,10 @@ class ComposeTranslationToolWindowTest : BasePlatformTestCase() {
 
     private fun arrayItemsPanel(dialog: AddStringDialog): JPanel =
         AddStringDialog::class.java.getDeclaredField("arrayItemsPanel").apply { isAccessible = true }
+            .get(dialog) as JPanel
+
+    private fun typeCards(dialog: AddStringDialog): JPanel =
+        AddStringDialog::class.java.getDeclaredField("typeCards").apply { isAccessible = true }
             .get(dialog) as JPanel
 
     private fun dialogContent(dialog: AddStringDialog): Component =

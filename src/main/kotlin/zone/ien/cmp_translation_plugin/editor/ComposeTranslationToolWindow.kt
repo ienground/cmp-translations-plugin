@@ -210,6 +210,10 @@ class ComposeTranslationToolWindow(private val project: Project) {
         table.autoResizeMode = JTable.AUTO_RESIZE_SUBSEQUENT_COLUMNS
         table.rowHeight = 24
         table.setDefaultRenderer(String::class.java, TranslationCellRenderer())
+        table.setDefaultRenderer(
+            Boolean::class.javaObjectType,
+            TranslationBooleanCellRenderer(table.getDefaultRenderer(Boolean::class.javaObjectType)),
+        )
         table.setDefaultEditor(String::class.java, MissingAwareCellEditor(table.getDefaultEditor(String::class.java)))
         table.columnModel.getColumn(0).cellRenderer = TranslationKeyCellRenderer()
         
@@ -588,7 +592,6 @@ internal class AddStringDialog(
         arrayItemsPanel.layout = javax.swing.BoxLayout(arrayItemsPanel, javax.swing.BoxLayout.Y_AXIS)
         arrayItemsPanel.isOpaque = false
         arrayItems.forEach(::addArrayItemRow)
-        showTypeCard()
         init()
     }
 
@@ -630,6 +633,7 @@ internal class AddStringDialog(
         }
         typeCards.add(createStringFields(), "string")
         typeCards.add(createArrayFields(), "string-array")
+        showTypeCard()
         return JPanel(BorderLayout(0, 8)).apply {
             add(typeSelector, BorderLayout.NORTH)
             add(JPanel(BorderLayout()).apply {
@@ -1323,6 +1327,30 @@ private class TranslationCellRenderer : DefaultTableCellRenderer() {
         
         component.font = table.font
         return component
+    }
+}
+
+private class TranslationBooleanCellRenderer(
+    private val delegate: javax.swing.table.TableCellRenderer,
+) : javax.swing.table.TableCellRenderer {
+
+    override fun getTableCellRendererComponent(
+        table: JTable,
+        value: Any?,
+        isSelected: Boolean,
+        hasFocus: Boolean,
+        row: Int,
+        column: Int,
+    ): Component {
+        val model = table.model as? ComposeTranslationTableModel
+        val translationRow = model?.visibleRows()?.getOrNull(table.convertRowIndexToModel(row))
+        if (translationRow?.isChild == true) {
+            return JPanel().apply {
+                isOpaque = true
+                background = if (isSelected) table.selectionBackground else table.background
+            }
+        }
+        return delegate.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column)
     }
 }
 
